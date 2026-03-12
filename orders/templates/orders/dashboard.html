@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Minhas Ordens de Serviço</h2>
+    {% if user.type == 'COMPANY' %}
+        <a href="#" class="btn btn-primary">+ Nova Entrega</a>
+    {% endif %}
+</div>
+
+{% if orders %}
+    <div class="table-responsive">
+        <table class="table table-hover shadow bg-white rounded">
+            <thead class="table-light">
+                <tr>
+                    <th>#ID</th>
+                    <th>Status</th>
+                    <th>Prioridade</th>
+                    <th>Data</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for os in orders %}
+                <tr>
+                    <td>#{{ os.id }}</td>
+                    <td>
+                        <span class="badge 
+                            {% if os.status == 'PENDENTE' %}bg-warning
+                            {% elif os.status == 'ENTREGUE' %}bg-success
+                            {% else %}bg-info{% endif %}">
+                            {{ os.get_status_display }}
+                        </span>
+                    </td>
+                    <td>{{ os.get_priority_display }}</td>
+                    <td>{{ os.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary">Ver Detalhes</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="alert alert-info">Nenhuma ordem de serviço encontrada.</div>
+{% endif %}
+{% endblock %}

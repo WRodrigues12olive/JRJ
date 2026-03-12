@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'orders/css/os_create.css' %}">
+
+<div class="min-vh-100 bg-light pb-5" style="font-family: 'Segoe UI', system-ui, sans-serif;">
+    
+    <header class="text-white pt-4 px-4 mb-4" style="background: linear-gradient(90deg, #041E14 0%, #0F5132 45%, #215a24 100%); padding-bottom: 5rem !important;">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            
+            <div class="d-flex align-items-center gap-4">
+    
+                <img src="{% static 'passaro-Photoroom.ico' %}" alt="Logo JRJ Express" style="height: 80px; width: 80px; object-fit: contain; transform: scale(1.7); margin-left: 10px;">
+                
+                <div>
+                    <h2 class="mb-0 fw-bold text-white">Nova Ordem de Serviço</h2>
+                    <p class="text-white-50 fs-5 mb-0 mt-1">Preencha as informações abaixo para gerar a OS de entrega.</p>
+                </div>
+                
+            </div>
+
+        </div>
+    </header>
+
+    <main class="container" style="margin-top: -4rem;">
+        <form id="osForm">
+            <div class="card rounded-xl shadow-sm border-0 mb-4 overflow-hidden">
+                <div class="card-header-custom">
+                    <div class="icon-box"><i class="bi bi-building"></i></div>
+                    <h5 class="mb-0 fw-bold text-dark">Informações Gerais</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold text-secondary">Empresa Solicitante *</label>
+                            <input type="text" id="req_company" class="form-control input-custom" placeholder="Nome da empresa" 
+                                value="{{ request.user.first_name }}" required readonly style="background-color: #e2e8f0; cursor: not-allowed;">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-secondary">CNPJ *</label>
+                            <input type="text" id="req_cnpj" class="form-control input-custom" placeholder="00.000.000/0000-00" 
+                                maxlength="18" value="{{ request.user.cnpj_cpf }}" required readonly style="background-color: #e2e8f0; cursor: not-allowed;">
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-secondary">Nome do Responsável *</label>
+                            <input type="text" id="req_name" class="form-control input-custom" placeholder="Pessoa de contato" 
+                                value="{{ request.user.username }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-secondary">Telefone *</label>
+                            <input type="text" id="req_phone" class="form-control input-custom" placeholder="(00) 00000-0000" 
+                                maxlength="15" value="{{ request.user.phone }}" required oninput="this.value = formatPhone(this.value)">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-secondary">E-mail *</label>
+                            <input type="email" id="req_email" class="form-control input-custom" placeholder="contato@empresa.com" 
+                                value="{{ request.user.email }}" required>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-secondary">Tipo de Entrega *</label>
+                            <select id="delivery_type" class="form-select input-custom" required>
+                                <option value="Normal">Normal</option>
+                                <option value="Urgente">Urgente</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-secondary">Veículo *</label>
+                            <select id="veh_type" class="form-select input-custom">
+                                <option value="MOTO">Moto</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card rounded-xl shadow-sm border-0 mb-4 overflow-hidden">
+                <div class="card-header-custom d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="icon-box"><i class="bi bi-box-arrow-up"></i></div>
+                        <h5 class="mb-0 fw-bold text-dark">Local de Coleta (Origem)</h5>
+                    </div>
+                    <button type="button" id="btnLoadOrigin" class="btn btn-sm btn-outline-primary fw-bold d-none" onclick="loadSavedOrigin()">
+                        <i class="bi bi-geo-alt"></i> Usar Endereço Salvo
+                    </button>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12"><input type="text" id="orig_name" class="form-control input-custom" placeholder="Nome do Local de Retirada *" required></div>
+                        <div class="col-md-3"><input type="text" id="orig_zip" class="form-control input-custom" placeholder="CEP" maxlength="9" oninput="this.value = formatCEP(this.value); buscarCEP(this, 'origem')"></div>
+                        <div class="col-md-7"><input type="text" id="orig_street" class="form-control input-custom" placeholder="Rua *" required></div>
+                        <div class="col-md-2"><input type="text" id="orig_number" class="form-control input-custom" placeholder="Número *" required></div>
+                        <div class="col-md-5"><input type="text" id="orig_district" class="form-control input-custom" placeholder="Bairro *" required></div>
+                        <div class="col-md-5"><input type="text" id="orig_city" class="form-control input-custom" placeholder="Cidade *" required></div>
+                        <div class="col-md-2"><input type="text" id="orig_state" class="form-control input-custom" placeholder="UF *" maxlength="2" required style="text-transform: uppercase;"></div>
+                    </div>
+                    
+                    <div class="form-check mt-3 pt-3 border-top">
+                        <input class="form-check-input cursor-pointer" type="checkbox" id="save_origin_check">
+                        <label class="form-check-label text-secondary small fw-bold cursor-pointer" for="save_origin_check">
+                            Salvar este endereço como padrão para as próximas OSs
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card rounded-xl shadow-sm border-0 mb-4 overflow-hidden">
+                <div class="card-header-custom">
+                    <div class="icon-box"><i class="bi bi-box-seam"></i></div>
+                    <h5 class="mb-0 fw-bold text-dark">Itens da Entrega</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div id="items-container" class="d-flex flex-column gap-3 mb-3"></div>
+                    <button type="button" onclick="addItem()" class="btn btn-outline-primary btn-sm fw-bold px-3 py-2 rounded-3 border-2">
+                        <i class="bi bi-plus-lg"></i> Adicionar Outro Item
+                    </button>
+                </div>
+            </div>
+
+            <div class="card rounded-xl shadow-sm border-0 mb-4 overflow-hidden">
+                <div class="card-header-custom">
+                    <div class="icon-box"><i class="bi bi-geo-alt"></i></div>
+                    <h5 class="mb-0 fw-bold text-dark">Destinos de Entrega & Distribuição</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div id="locations-container" class="d-flex flex-column gap-4 mb-3"></div>
+                    <button type="button" onclick="addLocation()" class="btn btn-outline-primary btn-sm fw-bold px-3 py-2 rounded-3 border-2">
+                        <i class="bi bi-plus-lg"></i> Adicionar Novo Destino
+                    </button>
+                </div>
+            </div>
+
+            <div class="card rounded-xl shadow-sm border-0 mb-4 overflow-hidden">
+                <div class="card-header-custom">
+                    <div class="icon-box"><i class="bi bi-card-text"></i></div>
+                    <h5 class="mb-0 fw-bold text-dark">Observações Gerais</h5>
+                </div>
+                <div class="card-body p-4">
+                    <label class="form-label small fw-bold text-secondary">Instruções Especiais / Observações Internas</label>
+                    <textarea id="general_notes" class="form-control input-custom" rows="4" placeholder="Adicione informações relevantes para o motorista, equipe de logística ou faturamento..."></textarea>
+                </div>
+            </div>
+
+            {% csrf_token %}
+            <div class="d-flex flex-column flex-sm-row justify-content-end gap-3 mt-4 mb-5 border-top pt-4">
+                <a href="{% url 'company_dashboard' %}" class="btn btn-light border px-4 py-2 rounded-3 fw-bold text-secondary">Cancelar</a>
+                <button type="button" id="btnSubmit" class="btn btn-primary px-5 py-2 rounded-3 fw-bold shadow-sm" onclick="submitForm()">
+                    <i class="bi bi-send"></i> Gerar OS Oficial
+                </button>
+            </div>
+        </form>
+    </main>
+</div>
+
+<template id="item-template">
+    <div class="item-card position-relative bg-slate-50 border rounded-3 p-4 transition-all" data-id="">
+        <button type="button" class="btn-remove" onclick="removeItem(this)"><i class="bi bi-trash fs-5"></i></button>
+        <div class="row g-3 mt-1">
+            <div class="col-md-5">
+                <label class="form-label small fw-bold text-secondary">Descrição do Item *</label>
+                <input type="text" class="form-control input-custom item-desc" placeholder="Ex: Lote de Documentos X" required oninput="syncItemsToLocations()">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold text-secondary">Qtd *</label>
+                <input type="number" class="form-control input-custom item-qty" min="1" value="1" required oninput="syncItemsToLocations()">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-secondary">Tipo *</label>
+                <select class="form-select input-custom item-type" required>
+                    <option value="Caixa">Caixa</option>
+                    <option value="Documento">Documento</option>
+                    <option value="Equipamento">Equipamento</option>
+                    <option value="Material Frágil">Material frágil</option>
+                    <option value="Outro">Outro</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold text-secondary">Peso (kg)</label>
+                <input type="number" step="0.1" min="0" class="form-control input-custom item-weight" placeholder="Ex: 2.5">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">Dimensões (AxLxP)</label>
+                <input type="text" class="form-control input-custom item-dim" placeholder="Ex: 10x20x15 cm">
+            </div>
+            <div class="col-md-8">
+                <label class="form-label small fw-bold text-secondary">Observação do Item</label>
+                <input type="text" class="form-control input-custom item-notes" placeholder="Ex: Cuidado, frágil">
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="location-template">
+    <div class="location-card position-relative bg-white border shadow-sm rounded-3 p-4" data-id="" style="border-color: var(--primary-border); border-radius: 12px;">
+        <button type="button" class="btn-remove" onclick="removeLocation(this)"><i class="bi bi-trash fs-5"></i></button>
+        <h6 class="fw-bold mb-3 text-brand-primary"><i class="bi bi-flag-fill"></i> Dados do Destinatário</h6>
+        
+        <div class="row g-2 mb-3">
+            <div class="col-md-6"><input type="text" class="form-control input-custom loc-name" placeholder="Destinatário (Nome/Empresa) *" required></div>
+            <div class="col-md-6"><input type="text" class="form-control input-custom loc-phone" placeholder="Telefone no Local *" maxlength="15" required oninput="this.value = formatPhone(this.value)"></div>
+            <div class="col-md-3"><input type="text" class="form-control input-custom loc-cep" placeholder="CEP *" maxlength="9" required oninput="this.value = formatCEP(this.value); buscarCEP(this, 'destino', this.closest('.location-card'))"></div>
+            <div class="col-md-7"><input type="text" class="form-control input-custom loc-street" placeholder="Endereço Completo (Rua/Av) *" required></div>
+            <div class="col-md-2"><input type="text" class="form-control input-custom loc-num" placeholder="Número *" required></div>
+            <div class="col-md-4"><input type="text" class="form-control input-custom loc-comp" placeholder="Complemento (Sala, Apto...)"></div>
+            <div class="col-md-4"><input type="text" class="form-control input-custom loc-dist" placeholder="Bairro *" required></div>
+            <div class="col-md-3"><input type="text" class="form-control input-custom loc-city" placeholder="Cidade *" required></div>
+            <div class="col-md-1"><input type="text" class="form-control input-custom loc-state" placeholder="UF *" maxlength="2" required style="text-transform: uppercase;"></div>
+            
+            <div class="col-md-9"><input type="text" class="form-control input-custom loc-ref" placeholder="Ponto de Referência"></div>
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0 fw-bold text-success">R$</span>
+                    <input type="number" step="0.01" min="0" class="form-control input-custom border-start-0 loc-value" placeholder="Valor (0.00)">
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 mt-3">
+            <h6 class="text-primary fw-bold small mb-2"><i class="bi bi-box-seam"></i> Quais itens serão entregues AQUI? *</h6>
+            <div class="linked-items-container d-flex flex-column gap-2"></div>
+        </div>
+    </div>
+</template>
+
+<script>
+    window.OS_CREATE_CONFIG = {
+        createUrl: "{% url 'os_create' %}",
+        dashboardUrl: "{% url 'company_dashboard' %}"
+    };
+</script>
+<script src="{% static 'orders/js/os_create.js' %}"></script>
+{% endblock %}

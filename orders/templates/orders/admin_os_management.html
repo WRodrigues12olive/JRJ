@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<script src="https://cdn.tailwindcss.com"></script>
+
+<div class="min-h-screen flex font-sans text-slate-800 selection:bg-blue-200" style="margin: -1.5rem; background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 45%, #f9fafb 100%);">
+
+  <aside id="mobile-menu" class="fixed inset-y-0 left-0 z-50 w-64 text-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0 -translate-x-full" style="background: linear-gradient(180deg, #041E14 0%, #0F5132 45%, #215a24 100%);">
+    <div class="flex items-center justify-center h-24">
+      <div class="flex items-center justify-center w-full px-4">
+        <img src="{% static 'passaro-Photoroom.ico' %}" alt="Logo JRJ Express" class="max-h-26 w-auto object-contain mt-16">
+      </div>
+    </div>
+    <nav class="p-4 space-y-1">
+      <p class="px-3 text-xs font-semibold text-white/90 uppercase tracking-wider mb-2 mt-4">Menu Principal</p>
+      <a href="{% url 'admin_dashboard' %}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-slate-800/60 text-white text-decoration-none">
+        <i class="bi bi-grid-1x2-fill"></i>
+        <span class="font-medium text-sm text-white">Dashboard</span>
+      </a>
+      <a href="{% url 'admin_os_management' %}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors bg-blue-600 text-white text-decoration-none shadow-sm">
+        <i class="bi bi-file-earmark-text"></i>
+        <span class="font-medium text-sm text-white">Gestão de OS</span>
+      </a>
+      <a href="{% url 'admin_motoboy_list' %}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-slate-800/60 text-white text-decoration-none">
+        <i class="bi bi-people"></i>
+        <span class="font-medium text-sm text-white">Motoboys</span>
+      </a>
+      <p class="px-3 text-xs font-semibold text-white/90 uppercase tracking-wider mb-2 mt-8">Administração</p>
+      <a href="{% url 'register_user' %}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-slate-800/60 text-white text-decoration-none">
+        <i class="bi bi-person-plus"></i>
+        <span class="font-medium text-sm text-white">Novo Utilizador</span>
+      </a>
+    </nav>
+    <div class="absolute bottom-0 w-full p-4 border-t border-white/10">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
+          {{ request.user.first_name|default:"AD"|slice:":2"|upper }}
+        </div>
+        <div>
+          <p class="text-sm font-medium text-white mb-0">{{ request.user.first_name|default:"Admin Geral" }}</p>
+          <p class="text-xs text-white/80 mb-0">Nível: Master</p>
+        </div>
+      </div>
+      <a href="{% url 'logout' %}" class="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-white hover:bg-rose-500/20 hover:text-white rounded-lg transition-colors text-decoration-none">
+        <i class="bi bi-box-arrow-right"></i> Sair do Sistema
+      </a>
+    </div>
+  </aside>
+
+  <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+    <div id="mobile-overlay" class="fixed inset-0 z-40 hidden md:hidden" style="background: rgba(15, 23, 42, 0.55);" onclick="toggleMenu()"></div>
+    <header class="border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm" style="background: rgba(255,255,255,0.96); backdrop-filter: blur(10px);">
+      <div class="flex items-center gap-4 w-full sm:w-auto">
+        <button class="md:hidden text-slate-500 btn btn-link p-0" onclick="toggleMenu()">
+          <i class="bi bi-list fs-3"></i>
+        </button>
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900 tracking-tight mb-0">Gestão de Ordens de Serviço</h1>
+          <p class="text-sm text-slate-500 flex items-center gap-2 mb-0 mt-1"><i class="bi bi-box-seam"></i> Visão geral das OS</p>
+        </div>
+      </div>
+      <a href="{% url 'admin_dashboard' %}" class="text-blue-600 font-medium hover:underline text-decoration-none text-sm"><i class="bi bi-arrow-left me-1"></i> Voltar ao Painel</a>
+    </header>
+
+    <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24">
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-6">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
+          <div class="md:col-span-5">
+            <input type="text" name="q" class="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300 outline-none" placeholder="Buscar por Nº da OS ou Empresa..." value="{{ q }}">
+          </div>
+          <div class="md:col-span-3">
+            <select name="status" class="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-300 outline-none">
+              <option value="">Todos os Status</option>
+              <option value="PENDENTE" {% if status_filter == 'PENDENTE' %}selected{% endif %}>Pendente</option>
+              <option value="EM_ROTA" {% if status_filter == 'EM_ROTA' %}selected{% endif %}>Em Rota</option>
+              <option value="ENTREGUE" {% if status_filter == 'ENTREGUE' %}selected{% endif %}>Entregue</option>
+              <option value="COM_OCORRENCIA" {% if status_filter == 'COM_OCORRENCIA' %}selected{% endif %}>Com Ocorrência</option>
+              <option value="CANCELADO" {% if status_filter == 'CANCELADO' %}selected{% endif %}>Cancelada</option>
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition shadow-sm">Buscar</button>
+          </div>
+          <div class="md:col-span-2">
+            <a href="{% url 'admin_os_management' %}" class="block w-full text-center border border-slate-300 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">Limpar</a>
+          </div>
+        </form>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-300 text-xs uppercase tracking-wider text-slate-100" style="background: #0F5132">
+                <th class="p-4 font-semibold">Nº OS</th>
+                <th class="p-4 font-semibold">Data Criação</th>
+                <th class="p-4 font-semibold">Empresa Solicitante</th>
+                <th class="p-4 font-semibold">Status</th>
+                <th class="p-4 font-semibold">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for os in page_obj %}
+              <tr class="hover:bg-slate-50/80 transition-colors">
+                <td class="p-4 font-bold font-mono text-slate-900">{{ os.os_number }}</td>
+                <td class="p-4 text-slate-600">{{ os.created_at|date:"d/m/Y H:i" }}</td>
+                <td class="p-4 text-slate-600">{{ os.client.first_name|default:os.client.username }}</td>
+                <td class="p-4"><span class="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">{{ os.get_status_display }}</span></td>
+                <td class="p-4"><a href="{% url 'os_details' os.id %}" class="text-blue-600 font-medium hover:underline text-decoration-none">Detalhes</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-4 mt-6 pt-4 border-t border-slate-200">
+          {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&status={{ status_filter }}" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 text-sm font-medium hover:bg-slate-50 transition">← Anterior</a>
+          {% else %}<span></span>{% endif %}
+          <span class="font-semibold text-slate-700 text-sm">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+          {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&status={{ status_filter }}" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 text-sm font-medium hover:bg-slate-50 transition">Próxima →</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  function toggleMenu() {
+    const menu = document.getElementById('mobile-menu');
+    const overlay = document.getElementById('mobile-overlay');
+    if (menu.classList.contains('-translate-x-full')) {
+      menu.classList.remove('-translate-x-full');
+      overlay.classList.remove('hidden');
+    } else {
+      menu.classList.add('-translate-x-full');
+      overlay.classList.add('hidden');
+    }
+  }
+</script>
+{% endblock %}

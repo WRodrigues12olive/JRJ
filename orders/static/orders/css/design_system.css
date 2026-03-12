@@ -1,0 +1,345 @@
+/* DESIGN SYSTEM GLOBAL - JRJ Express
+   Paleta, tipografia e componentes reutilizáveis.
+*/
+
+:root {
+  /* Cores principais */
+  --color-primary: #0F172A;
+  --color-primary-hover: #1E293B;
+  --color-secondary: #1D4ED8;
+  --color-accent: #3B82F6;
+
+  /* Fundo */
+  --color-bg: #F8FAFC;
+  --color-card: #FFFFFF;
+
+  /* Texto */
+  --color-text: #0F172A;
+  --color-text-muted: #475569;
+  --color-text-light: #FFFFFF;
+
+  /* Estados */
+  --color-success: #16A34A;
+  --color-error: #DC2626;
+  --color-warning: #F59E0B;
+  --color-info: #2563EB;
+
+  /* Sombra e borda */
+  --shadow-soft: 0 10px 25px rgba(15, 23, 42, 0.08);
+  --radius-card: 12px;
+  --radius-button: 8px;
+
+  /* Espaçamento base (8px scale) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+}
+
+/* Tipografia global */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+p, span, small, label {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+/* Layout base: sidebar + header */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  background-color: var(--color-bg);
+}
+
+.app-sidebar {
+  width: 260px;
+  background: var(--color-primary);
+  color: var(--color-text-light);
+  display: flex;
+  flex-direction: column;
+}
+
+.app-sidebar-brand {
+  height: 72px;
+  padding: 0 var(--space-4);
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.app-sidebar-nav {
+  flex: 1;
+  padding: var(--space-4);
+}
+
+.app-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-3);
+  border-radius: 999px;
+  color: rgba(241, 245, 249, 0.85);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.app-sidebar-link:hover {
+  background-color: var(--color-primary-hover);
+  color: #ffffff;
+}
+
+.app-sidebar-link.active {
+  background: linear-gradient(90deg, var(--color-secondary), var(--color-accent));
+  color: #ffffff;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-header {
+  height: 72px;
+  background-color: var(--color-card);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  padding: 0 var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.app-content {
+  padding: var(--space-5);
+}
+
+/* Cards */
+.ds-card {
+  background-color: var(--color-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  padding: var(--space-4);
+}
+
+.ds-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+/* Botões */
+.btn-primary-ds {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-light);
+  border-radius: var(--radius-button);
+  font-weight: 600;
+  padding-inline: var(--space-4);
+  padding-block: var(--space-2);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.btn-primary-ds:hover,
+.btn-primary-ds:focus {
+  background-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-secondary-ds {
+  background-color: #FFFFFF;
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+  border-radius: var(--radius-button);
+  font-weight: 600;
+  padding-inline: var(--space-4);
+  padding-block: var(--space-2);
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-secondary-ds:hover,
+.btn-secondary-ds:focus {
+  background-color: rgba(37, 99, 235, 0.06);
+  color: var(--color-secondary);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.btn-ghost-ds {
+  background-color: transparent;
+  border-radius: var(--radius-button);
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+}
+
+.btn-ghost-ds:hover {
+  background-color: rgba(148, 163, 184, 0.12);
+}
+
+/* Inputs */
+.form-control-ds,
+.form-select-ds {
+  border-radius: var(--radius-button);
+  border: 1px solid #CBD5F5;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  background-color: #FFFFFF;
+}
+
+.form-control-ds:focus,
+.form-select-ds:focus {
+  outline: none;
+  border-color: var(--color-secondary);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+}
+
+label.form-label-ds {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Tabela */
+.ds-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-card);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.ds-table thead {
+  background-color: var(--color-primary);
+  color: var(--color-text-light);
+}
+
+.ds-table th,
+.ds-table td {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+}
+
+.ds-table tbody tr:nth-child(even) {
+  background-color: #F1F5F9;
+}
+
+.ds-table tbody tr:hover {
+  background-color: #E2E8F0;
+}
+
+/* Badges de status */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-pendente,
+.status-PENDENTE {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #92400E;
+}
+
+.status-ACEITO,
+.status-em_rota {
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #1D4ED8;
+}
+
+.status-COLETADO {
+  background-color: rgba(37, 99, 235, 0.12);
+  color: #1D4ED8;
+}
+
+.status-ENTREGUE {
+  background-color: rgba(22, 163, 74, 0.1);
+  color: #166534;
+}
+
+.status-CANCELADO {
+  background-color: rgba(220, 38, 38, 0.08);
+  color: #B91C1C;
+}
+
+.status-OCORRENCIA {
+  background-color: rgba(220, 38, 38, 0.1);
+  color: #B91C1C;
+}
+
+/* Alertas e feedback */
+.ds-alert {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ds-alert-success {
+  background-color: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  color: #166534;
+}
+
+.ds-alert-error {
+  background-color: rgba(220, 38, 38, 0.06);
+  border: 1px solid rgba(220, 38, 38, 0.45);
+  color: #B91C1C;
+}
+
+.ds-alert-warning {
+  background-color: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #92400E;
+}
+
+/* Responsividade básica */
+@media (max-width: 991.98px) {
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 30;
+  }
+
+  .app-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .app-header {
+    padding-inline: var(--space-3);
+  }
+
+  .app-content {
+    padding: var(--space-3);
+  }
+}

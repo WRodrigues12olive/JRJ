@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    @media print {
+        @page { margin: 0.5cm; size: auto; }
+        body { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .app-container { padding: 0 !important; background-color: white !important; }
+        .container { max-width: 100% !important; width: 100% !important; padding: 0 !important; }
+    }
+</style>
+<div class="app-container font-sans bg-slate-50 min-vh-100 pb-5">
+    
+    <div class="bg-slate-900 text-white px-4 py-3 shrink-0 d-flex align-items-center justify-content-between shadow-sm sticky-top z-3 d-print-none">
+        <div class="d-flex align-items-center gap-3">
+            <button onclick="history.back()" class="btn btn-link text-white p-2 text-decoration-none rounded-circle hover-bg-slate-800">
+                <i class="bi bi-arrow-left fs-4"></i>
+            </button>
+            <div>
+                <h5 class="fw-bold mb-0">Detalhes da Ordem de Serviço</h5>
+                <span class="text-slate-400 small">Visão Completa</span>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-light btn-sm fw-bold">
+                <i class="bi bi-printer"></i> Imprimir
+            </button>
+        </div>
+    </div>
+
+    <main class="container py-4 max-w-5xl">
+        
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center bg-white p-4 rounded-4 shadow-sm border border-light mb-4 gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="bg-primary bg-opacity-10 p-3 rounded-4">
+                    <i class="bi bi-box-seam fs-2 text-primary"></i>
+                </div>
+                <div>
+                    <h2 class="fw-bold font-monospace text-dark mb-1">{{ os.os_number }}</h2>
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
+                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1">{{ os.status }}</span>
+                        <span class="badge {% if os.priority == 'URGENTE' %}bg-danger{% else %}bg-secondary{% endif %} bg-opacity-10 text-dark border px-2 py-1">
+                            {{ os.get_priority_display }}
+                        </span>
+                        <span class="text-muted small fw-bold"><i class="bi bi-calendar-event"></i> Criada em {{ os.created_at|date:"d/m/Y H:i" }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-start text-md-end bg-slate-50 p-3 rounded-3 border w-100" style="max-width: 300px;">
+                <p class="text-slate-500 small fw-bold text-uppercase mb-1">Motoboy Atribuído</p>
+                {% if os.motoboy %}
+                    <p class="fw-bold text-dark mb-0 d-flex align-items-center justify-content-md-end gap-2">
+                        <i class="bi bi-person-circle text-primary"></i> {{ os.motoboy.user.first_name }}
+                    </p>
+                {% else %}
+                    <p class="fw-bold text-warning mb-0"><i class="bi bi-hourglass-split"></i> Aguardando Atribuição</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-5">
+                
+                <div class="bg-white p-4 rounded-4 shadow-sm border border-light mb-4">
+                    <h6 class="fw-bold text-dark text-uppercase mb-3 small border-bottom pb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-building text-secondary"></i> Dados do Solicitante
+                    </h6>
+                    <p class="mb-1"><span class="text-muted small">Empresa:</span> <strong class="text-dark">{{ os.client.first_name|default:os.client.username }}</strong></p>
+                    <p class="mb-1"><span class="text-muted small">CNPJ:</span> <strong class="text-dark">{{ os.company_cnpj|default:"Não informado" }}</strong></p>
+                    <p class="mb-1"><span class="text-muted small">Solicitante:</span> <strong class="text-dark">{{ os.requester_name }}</strong></p>
+                    <p class="mb-1"><span class="text-muted small">Telefone:</span> <strong class="text-dark">{{ os.requester_phone }}</strong></p>
+                    <p class="mb-1"><span class="text-muted small">Método Pagamento:</span> <strong class="text-dark">{{ os.get_payment_method_display }}</strong></p>
+                    <p class="mb-0"><span class="text-muted small">Veículo Exigido:</span> <strong class="text-dark">{{ os.get_vehicle_type_display }}</strong></p>
+                </div>
+
+                <div class="bg-white p-4 rounded-4 shadow-sm border border-light mb-4 border-top border-warning border-4">
+                    <h6 class="fw-bold text-warning text-uppercase mb-3 small border-bottom pb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-geo-alt-fill"></i> Local de Coleta (Origem)
+                    </h6>
+                    <h5 class="fw-bold text-dark mb-1">{{ os.origin_name }}</h5>
+                    <p class="text-slate-600 mb-2">{{ os.origin_street }}, {{ os.origin_number }}{% if os.origin_complement %} - {{ os.origin_complement }}{% endif %}</p>
+                    <p class="text-slate-600 mb-2">Bairro {{ os.origin_district }} - {{ os.origin_city }}/{{ os.origin_state|default:"RS" }}</p>
+                    <p class="text-slate-600 mb-3">CEP: {{ os.origin_zip_code }}</p>
+                    
+                    <div class="bg-slate-50 p-2 rounded-3 border small">
+                        <p class="mb-1"><span class="text-muted">Contato Local:</span> <strong>{{ os.origin_responsible }} ({{ os.origin_phone }})</strong></p>
+                        <p class="mb-0"><span class="text-muted">Ref:</span> <strong>{{ os.origin_reference|default:"Nenhuma" }}</strong></p>
+                    </div>
+                </div>
+
+                {% if os.operational_notes %}
+                <div class="bg-white p-4 rounded-4 shadow-sm border border-danger border-opacity-25 mb-4">
+                    <h6 class="fw-bold text-danger text-uppercase mb-3 small border-bottom border-danger border-opacity-25 pb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-square-fill"></i> Observações Operacionais
+                    </h6>
+                    <p class="text-dark small mb-0" style="white-space: pre-wrap;">{{ os.operational_notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="col-lg-7">
+                
+                <div class="bg-white p-4 rounded-4 shadow-sm border border-light mb-4">
+                    <h6 class="fw-bold text-primary text-uppercase mb-3 small border-bottom pb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-boxes"></i> Relação de Itens ({{ items.count }} itens diferentes)
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-borderless align-middle mb-0">
+                            <thead class="table-light small text-muted text-uppercase">
+                                <tr>
+                                    <th>Qtd</th>
+                                    <th>Descrição / Tipo</th>
+                                    <th>Peso/Dim.</th>
+                                    <th>Status (Posse)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td class="fw-bold fs-5">{{ item.total_quantity }}x</td>
+                                    <td>
+                                        <p class="fw-bold text-dark mb-0">{{ item.description }}</p>
+                                        <p class="small text-muted mb-0">{{ item.item_type|default:"Embalagem Padrão" }}</p>
+                                    </td>
+                                    <td class="small">
+                                        {% if item.weight %}{{ item.weight }}kg<br>{% endif %}
+                                        <span class="text-muted">{{ item.dimensions|default:"-" }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if item.status == 'ENTREGUE' %}bg-success{% elif item.status == 'COLETADO' %}bg-primary{% else %}bg-secondary{% endif %} bg-opacity-10 text-dark border">
+                                            {{ item.get_status_display }}
+                                        </span>
+                                        {% if item.posse_atual %}
+                                            <p class="mb-0 mt-1 small text-muted" style="font-size: 0.65rem;">Com: {{ item.posse_atual.user.first_name }}</p>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if item.item_notes %}
+                                <tr>
+                                    <td colspan="4" class="pt-0 pb-3">
+                                        <div class="bg-warning bg-opacity-10 text-dark small p-2 rounded-2 border border-warning border-opacity-25">
+                                            <i class="bi bi-info-circle"></i> <strong>Nota do Item:</strong> {{ item.item_notes }}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% empty %}
+                                <tr><td colspan="4" class="text-center text-muted">Nenhum item cadastrado.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-4 shadow-sm border border-light mb-4 border-top border-success border-4">
+                    <h6 class="fw-bold text-success text-uppercase mb-3 small border-bottom pb-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-geo-fill"></i> Locais de Entrega ({{ destinations.count }} destino{% if destinations.count > 1 %}s{% endif %})
+                    </h6>
+                    
+                    <div class="d-flex flex-column gap-3">
+                        {% for dest in destinations %}
+                        <div class="bg-slate-50 border rounded-3 p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2 gap-3">
+                                <div class="flex-grow-1">
+                                    <h6 class="fw-bold text-dark mb-1">{{ dest.destination_name }}</h6>
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 fs-6">
+                                        R$ {{ dest.delivery_value|floatformat:2 }}
+                                    </span>
+                                </div>
+                                <div>
+                                    {% if dest.is_delivered %}
+                                        <span class="badge bg-success text-white"><i class="bi bi-check2-all"></i> Entregue</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Pendente</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <p class="small text-muted mb-2"><i class="bi bi-telephone"></i> {{ dest.destination_phone }}</p>
+                            
+                            <p class="text-dark small fw-bold mb-1">{{ dest.destination_street }}, {{ dest.destination_number }}{% if dest.destination_complement %} - {{ dest.destination_complement }}{% endif %}</p>
+                            <p class="text-slate-600 small mb-2">{{ dest.destination_district }}, {{ dest.destination_city }}/{{ dest.destination_state|default:"RS" }} - {{ dest.destination_zip_code }}</p>
+                            
+                            {% if dest.destination_notes %}
+                                <div class="alert alert-secondary py-2 mb-2 small border-secondary border-opacity-25">{{ dest.destination_notes }}</div>
+                            {% endif %}
+                            
+                            <div class="mt-2 pt-2 border-top border-light">
+                                <span class="small fw-bold text-slate-500">Itens alocados para este endereço:</span>
+                                <ul class="list-unstyled mb-0 mt-1 small">
+                                    {% for dist in dest.distributed_items.all %}
+                                        <li><i class="bi bi-dot text-primary"></i> <strong>{{ dist.quantity_allocated }}x</strong> {{ dist.item.description }}</li>
+                                    {% empty %}
+                                        <li class="text-muted">Erro: Nenhum item vinculado.</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+
+                            {% if dest.is_delivered %}
+                            <div class="mt-3 pt-3 border-top border-success border-opacity-25 d-flex flex-wrap gap-3">
+                                <div class="flex-grow-1">
+                                    <span class="small fw-bold text-success">Informações de Entrega:</span>
+                                    <p class="mb-0 small text-dark mt-1"><strong>Data/Hora:</strong> {{ dest.delivered_at|date:"d/m/Y H:i" }}</p>
+                                    <p class="mb-0 small text-dark"><strong>Recebedor:</strong> {{ dest.receiver_name|default:"Não informado" }}</p>
+                                </div>
+                                {% if dest.proof_photo %}
+                                <div>
+                                    <a href="{{ dest.proof_photo.url }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                        <i class="bi bi-image"></i> Ver Comprovante
+                                    </a>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+</div>
+{% endblock %}

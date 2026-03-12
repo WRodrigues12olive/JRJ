@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .input-edit { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 0.5rem 0.75rem; border-radius: 0.5rem; transition: all 0.2s; width: 100%; }
+  .input-edit:focus { background-color: #fff; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); outline: none; }
+</style>
+
+<div class="min-h-screen flex font-sans text-slate-800 selection:bg-blue-200" style="margin: -1.5rem; background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 45%, #f9fafb 100%);">
+
+  <aside id="mobile-menu" class="fixed inset-y-0 left-0 z-50 w-64 text-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0 -translate-x-full" style="background: linear-gradient(180deg, #041E14 0%, #0F5132 45%, #215a24 100%);">
+    <div class="flex items-center justify-center h-24">
+      <div class="flex items-center justify-center w-full px-4">
+        <img src="{% static 'passaro-Photoroom.ico' %}" alt="Logo JRJ Express" class="max-h-26 w-auto object-contain mt-16">
+      </div>
+    </div>
+    <nav class="p-4 space-y-1">
+      <p class="px-3 text-xs font-semibold text-white/90 uppercase tracking-wider mb-2 mt-4">Menu Principal</p>
+      <a href="{% url 'admin_dashboard' %}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-slate-800/60 text-white text-decoration-none">
+        <i class="bi bi-grid-1x2-fill"></i>
+        <span class="font-medium text-sm text-white">Dashboard</span>
+      </a>
+      <a href="{% url 'admin_os_management' %}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-slate-800/60 text-white text-decoration-none">
+        <i class="bi bi-file-earmark-text"></i>
+        <span class="font-medium text-sm text-white">Gestão de OS</span>
+      </a>
+      <a href="{% url 'admin_motoboy_list' %}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors bg-blue-600 text-white text-decoration-none shadow-sm">
+        <i class="bi bi-people"></i>
+        <span class="font-medium text-sm text-white">Motoboys</span>
+      </a>
+      <p class="px-3 text-xs font-semibold text-white/90 uppercase tracking-wider mb-2 mt-8">Administração</p>
+      <a href="{% url 'register_user' %}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-slate-800/60 text-white text-decoration-none">
+        <i class="bi bi-person-plus"></i>
+        <span class="font-medium text-sm text-white">Novo Utilizador</span>
+      </a>
+    </nav>
+    <div class="absolute bottom-0 w-full p-4 border-t border-white/10">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
+          {{ request.user.first_name|default:"AD"|slice:":2"|upper }}
+        </div>
+        <div>
+          <p class="text-sm font-medium text-white mb-0">{{ request.user.first_name|default:"Admin Geral" }}</p>
+          <p class="text-xs text-white/80 mb-0">Nível: Master</p>
+        </div>
+      </div>
+      <a href="{% url 'logout' %}" class="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-white hover:bg-rose-500/20 hover:text-white rounded-lg transition-colors text-decoration-none">
+        <i class="bi bi-box-arrow-right"></i> Sair do Sistema
+      </a>
+    </div>
+  </aside>
+
+  <main class="flex-1 flex flex-col min-h-screen overflow-auto relative">
+    <div id="mobile-overlay" class="fixed inset-0 z-40 hidden md:hidden" style="background: rgba(15, 23, 42, 0.55);" onclick="toggleMenu()"></div>
+    <header class="border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm" style="background: rgba(255,255,255,0.96); backdrop-filter: blur(10px);">
+      <div class="flex items-center gap-4 w-full sm:w-auto">
+        <button class="md:hidden text-slate-500 btn btn-link p-0" onclick="toggleMenu()">
+          <i class="bi bi-list fs-3"></i>
+        </button>
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900 tracking-tight mb-0">Editar Motoboy</h1>
+          <p class="text-sm text-slate-500 flex items-center gap-2 mb-0 mt-1"><i class="bi bi-person-gear"></i> {{ motoboy.user.first_name }}</p>
+        </div>
+      </div>
+      <a href="{% url 'admin_motoboy_list' %}" class="text-blue-600 font-medium hover:underline text-decoration-none text-sm"><i class="bi bi-arrow-left me-1"></i> Voltar à Lista</a>
+    </header>
+
+    <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 flex justify-center">
+      <div class="w-full max-w-2xl bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-6 sm:p-8">
+        <form method="POST" action="">
+          {% csrf_token %}
+
+          <h6 class="text-sm font-bold text-slate-500 border-b border-slate-200 pb-2 mb-4">Dados Pessoais & Conta</h6>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label class="block text-sm font-semibold text-slate-600 mb-1">Nome de Exibição</label>
+              <input type="text" name="first_name" class="input-edit" value="{{ motoboy.user.first_name }}">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-600 mb-1">Telefone</label>
+              <input type="text" name="phone" class="input-edit" value="{{ motoboy.user.phone }}">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-600 mb-1">E-mail (Login)</label>
+              <input type="email" name="email" class="input-edit" value="{{ motoboy.user.email }}">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-rose-600 mb-1"><i class="bi bi-key"></i> Nova Senha (Opcional)</label>
+              <input type="text" name="new_password" class="input-edit border-rose-300" placeholder="Digite para alterar a senha">
+              <small class="text-slate-500 text-xs mt-1 block">Deixe em branco para não alterar.</small>
+            </div>
+            <div class="md:col-span-2 mt-2">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" name="is_active" class="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" {% if motoboy.user.is_active %}checked{% endif %}>
+                <span class="text-sm font-bold {% if motoboy.user.is_active %}text-emerald-700{% else %}text-rose-600{% endif %}">Permitir Acesso à Aplicação (Conta Ativa)</span>
+              </label>
+            </div>
+          </div>
+
+          <h6 class="text-sm font-bold text-slate-500 border-b border-slate-200 pb-2 mb-4 mt-6">Dados do Veículo</h6>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label class="block text-sm font-semibold text-slate-600 mb-1">CNH</label>
+              <input type="text" name="cnh_number" class="input-edit" value="{{ motoboy.cnh_number }}" maxlength="11" inputmode="numeric" pattern="[0-9]{11}" title="Apenas números, 11 dígitos" oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-600 mb-1">Placa do Veículo</label>
+              <input type="text" name="vehicle_plate" class="input-edit uppercase" value="{{ motoboy.vehicle_plate }}" maxlength="7" oninput="this.value=this.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,7)">
+            </div>
+          </div>
+
+          <h6 class="text-sm font-bold text-blue-700 border-b border-blue-200 pb-2 mb-4 mt-6 flex items-center gap-2"><i class="bi bi-cash-coin"></i> Gestão Financeira</h6>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="md:col-span-3">
+              <label class="block text-sm font-semibold text-slate-600 mb-1">Categoria do Profissional</label>
+              <select name="category" class="input-edit bg-slate-50 border-slate-300 font-semibold text-slate-800">
+                <option value="TELE" {% if motoboy.category == 'TELE' %}selected{% endif %}>Tele-Entrega (Ganha por entrega)</option>
+                <option value="DIARIA" {% if motoboy.category == 'DIARIA' %}selected{% endif %}>Diarista (Ganha por dia fixo)</option>
+                <option value="MENSAL" {% if motoboy.category == 'MENSAL' %}selected{% endif %}>Mensalista (Ganha valor fixo no mês)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-600 mb-1">Porcentagem da Entrega (%)</label>
+              <input type="number" step="0.01" min="0" max="100" name="delivery_percentage" class="input-edit" value="{{ motoboy.delivery_percentage }}">
+              <small class="text-slate-500 text-xs mt-1 block">Aplica-se apenas à categoria Tele-Entrega.</small>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-600 mb-1">Valor da Diária (R$)</label>
+              <input type="number" step="0.01" min="0" name="daily_rate" class="input-edit" value="{{ motoboy.daily_rate }}">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-600 mb-1">Valor Mensal (R$)</label>
+              <input type="number" step="0.01" min="0" name="monthly_rate" class="input-edit" value="{{ motoboy.monthly_rate }}">
+            </div>
+          </div>
+
+          <div class="pt-6 border-t border-slate-200 flex justify-end">
+            <button type="submit" class="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-sm flex items-center gap-2">
+              <i class="bi bi-save"></i> Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  function toggleMenu() {
+    const menu = document.getElementById('mobile-menu');
+    const overlay = document.getElementById('mobile-overlay');
+    if (menu.classList.contains('-translate-x-full')) {
+      menu.classList.remove('-translate-x-full');
+      overlay.classList.remove('hidden');
+    } else {
+      menu.classList.add('-translate-x-full');
+      overlay.classList.add('hidden');
+    }
+  }
+</script>
+{% endblock %}

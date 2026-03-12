@@ -1,0 +1,37 @@
+body { background-color: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+.bg-slate-900 { background-color: #0f172a; }
+.text-primary-custom { color: #1d4ed8; }
+.btn-primary-custom { background-color: #1d4ed8; border: none; transition: 0.3s; }
+.btn-primary-custom:hover { background-color: #1e3a8a; transform: translateY(-2px); }
+.input-custom { background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 0.6rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+.input-custom:focus { background-color: #ffffff; border-color: #3b82f6; box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25); outline: none; }
+.card-custom { border: none; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); overflow: hidden; }
+
+/* Safe areas (notch, home indicator) */
+.pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+.pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+
+.motoboy-title { color: #ffffff !important;}
+
+/* Touch targets: mínimo 44px para dedo */
+.touch-target { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.touch-target.btn { padding: 0.6rem 1rem; }
+
+/* ========== Mobile (perfil) ========== */
+@media (max-width: 767.98px) {
+    .motoboy-profile-wrap { align-items: flex-start; padding-top: 0.5rem; }
+    .motoboy-title { font-size: 1.25rem; color: #f8fafc !important; }
+    .motoboy-avatar { width: 56px !important; height: 56px !important; }
+    .motoboy-avatar .fs-1 { font-size: 1.5rem !important; }
+    .card-body .form-label { margin-bottom: 0.25rem; }
+    .entregas-filter .date-input { min-height: 42px; font-size: 1rem; }
+    .entregas-filter .btn { min-height: 44px; }
+    .entregas-cards .entregas-card-item { padding: 0.75rem 1rem; }
+    .total-periodo { font-size: 0.875rem; }
+}
+
+@media (max-width: 575.98px) {
+    .container.px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .motoboy-profile-wrap .form-control { font-size: 16px; }
+    .motoboy-profile-wrap .form-select { font-size: 16px; }
+}

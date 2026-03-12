@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'orders/css/company_dashboard.css' %}">
+
+<div class="dashboard-wrapper font-sans">
+
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <aside class="sidebar-custom shadow-lg" id="mainSidebar" style="background: linear-gradient(180deg, #041E14 0%, #0F5132 45%, #215a24 100%);">
+    
+        <div class="d-flex align-items-center justify-content-center px-4 pt-5 pb-3 position-relative">
+            
+            <img src="{% static 'passaro-Photoroom.ico' %}" alt="Logo JRJ Express" style="height: 80px; width: auto; object-fit: contain; transform: scale(1.5);">
+            
+            <button class="btn btn-link text-white d-lg-none position-absolute top-0 end-0 mt-3 me-3 p-0 text-decoration-none" onclick="toggleSidebar()">
+                <i class="bi bi-x-lg fs-4"></i>
+            </button>
+            
+        </div>
+        
+        <div class="flex-grow-1 overflow-y-auto px-3 py-4">
+            <p class="text-white small fw-bold text-uppercase mb-2 px-3">Painel Principal</p>
+            <a href="{% url 'company_dashboard' %}" class="sidebar-link active mb-2">
+                <i class="bi bi-grid-1x2-fill text-white"></i> Meu Dashboard
+            </a>
+        </div>
+
+        <div class="p-3 border-top border-secondary border-opacity-25">
+            <div class="d-flex align-items-center gap-3 px-2 py-2 rounded hover-bg-slate-800">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold border border-2 border-info" style="width: 40px; height: 40px;">
+                    {{ company_initials }}
+                </div>
+                <div class="d-flex flex-column text-truncate">
+                    <span class="small fw-bold text-white text-truncate">{{ user.first_name|default:user.username }}</span>
+                    <span class="text-slate-400" style="font-size: 0.7rem;">Configurações</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="main-content">
+        
+        <header class="bg-white border-bottom px-4 d-flex align-items-center justify-content-between shrink-0 shadow-sm" style="height: 80px; z-index: 10;">
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn btn-light border d-lg-none text-secondary shadow-sm" onclick="toggleSidebar()">
+                    <i class="bi bi-list fs-4"></i>
+                </button>
+                <div>
+                    <h4 class="fw-bold mb-0 text-dark">Olá, {{ user.first_name|default:"Cliente" }}</h4>
+                    <p class="text-slate-500 small mb-0 d-none d-md-block">Acompanhe suas solicitações ou crie novas OS.</p>
+                </div>
+            </div>
+            
+            <div class="d-flex align-items-center gap-2 gap-md-3">
+                <a href="{% url 'os_create' %}" class="btn btn-primary fw-bold rounded-xl shadow-sm px-3 px-md-4 py-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline text-white">Nova Solicitação</span><span class="d-sm-none">Nova</span>
+                </a>
+                
+                <a href="{% url 'logout' %}" class="btn btn-outline-danger fw-bold rounded-xl shadow-sm px-3 py-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-box-arrow-right"></i> <span class="d-none d-sm-inline text-black">Sair</span>
+                </a>
+            </div>
+        </header>
+
+        <main class="p-3 p-md-5">
+            <div class="container-fluid max-w-7xl mx-auto p-0">
+                
+                <div class="row g-3 mb-4 mb-md-5">
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="card metric-card border-0 shadow-sm rounded-2xl h-100 p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="text-slate-500 small fw-bold">Pendentes</span>
+                                <div class="bg-warning bg-opacity-25 text-warning p-2 rounded-3"><i class="bi bi-clock"></i></div>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0">{{ metrics.pending }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-3">
+                        <div class="card metric-card border-0 shadow-sm rounded-2xl h-100 p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="text-slate-500 small fw-bold">Em Andamento</span>
+                                <div class="bg-primary bg-opacity-10 text-primary p-2 rounded-3"><i class="bi bi-truck"></i></div>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0">{{ metrics.in_progress }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-3">
+                        <div class="card metric-card border-0 shadow-sm rounded-2xl h-100 p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="text-slate-500 small fw-bold">Entregues</span>
+                                <div class="bg-success bg-opacity-10 text-success p-2 rounded-3"><i class="bi bi-check-circle-fill"></i></div>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0">{{ metrics.delivered }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-6 col-xl-2">
+                        <div class="card metric-card border-0 shadow-sm rounded-2xl h-100 p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="text-slate-500 small fw-bold">Ocorrências</span>
+                                <div class="bg-danger bg-opacity-10 text-danger p-2 rounded-3"><i class="bi bi-exclamation-triangle"></i></div>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0">0</h3>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-2">
+                        <div class="card metric-card border-0 shadow-sm rounded-2xl h-100 p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="text-slate-500 small fw-bold">Canceladas</span>
+                                <div class="p-2 rounded-3" style="background-color: var(--neutral-100); color: var(--text-muted);"><i class="bi bi-x-lg"></i></div>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0">{{ metrics.canceled }}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-xl-9">
+                        <div class="card border-0 shadow-sm rounded-2xl h-100">
+                            <div class="card-header bg-white border-bottom p-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center rounded-top-2xl gap-3">
+                                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-activity text-primary me-2"></i> Minhas OS Ativas</h5>
+                                <div class="input-group" style="max-width: 250px;">
+                                    <span class="input-group-text bg-slate-50 border-end-0 text-slate-400"><i class="bi bi-search"></i></span>
+                                    <input type="text" class="form-control bg-slate-50 border-start-0" placeholder="Buscar OS...">
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-slate-50 text-slate-500 small text-uppercase">
+                                        <tr>
+                                            <th class="px-4 py-3 border-bottom-0">Nº OS</th>
+                                            <th class="px-4 py-3 border-bottom-0">Status</th>
+                                            <th class="px-4 py-3 border-bottom-0">Coleta (Origem)</th>
+                                            <th class="px-4 py-3 border-bottom-0">Criada em</th>
+                                            <th class="px-4 py-3 border-bottom-0 text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="border-top-0">
+                                        {% for os in ativas %}
+                                        <tr>
+                                            <td class="px-4 py-3">
+                                                <span class="fw-bold font-monospace text-dark">{{ os.os_number }}</span><br>
+                                                <span class="badge bg-light text-secondary border border-secondary border-opacity-25">{{ os.get_priority_display }}</span>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <span class="status-badge status-{{ os.status }}">{{ os.get_status_display }}</span>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <span class="fw-bold text-dark d-block">{{ os.origin_name }}</span>
+                                                <small class="text-slate-500 text-truncate d-inline-block" style="max-width: 200px;">{{ os.origin_district }}, {{ os.origin_city }}</small>
+                                            </td>
+                                            <td class="px-4 py-3 small text-slate-500">
+                                                {{ os.created_at|date:"d/m/Y" }}<br>{{ os.created_at|date:"H:i" }}
+                                            </td>
+                                            <td class="px-4 py-3 text-end">
+                                                <div class="d-flex justify-content-end gap-2">
+                                                    <button class="btn btn-sm btn-light text-primary border rounded-3 shadow-sm" 
+                                                            data-os="{{ os.os_number }}"
+                                                            data-status="{{ os.get_status_display }}"
+                                                            data-origin="{{ os.origin_name }}"
+                                                            data-date="{{ os.created_at|date:'d/m/Y H:i' }}"
+                                                            onclick="openOSDetails(this)" 
+                                                            title="Ver Detalhes">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                            
+                                                    {% if os.status == 'PENDENTE' %}
+                                                    <button class="btn btn-sm btn-light text-danger border rounded-3 shadow-sm" 
+                                                            onclick="if(confirm('Tem certeza que deseja cancelar a OS {{ os.os_number }}?')) {
+                                                                fetch('{% url 'cancel_os' os.id %}', {
+                                                                    method: 'POST',
+                                                                    headers: {'X-CSRFToken': '{{ csrf_token }}'}
+                                                                }).then(response => {
+                                                                    if(response.ok) window.location.reload();
+                                                                    else alert('Erro ao cancelar a OS.');
+                                                                });
+                                                            }" 
+                                                            title="Cancelar Solicitação">
+                                                        <i class="bi bi-x-circle"></i>
+                                                    </button>
+                                                    {% else %}
+                                                    <button class="btn btn-sm btn-light text-muted border rounded-3 shadow-sm" 
+                                                            disabled 
+                                                            title="Não é possível cancelar uma OS que já está em andamento">
+                                                        <i class="bi bi-x-circle"></i>
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="5" class="text-center py-5">
+                                                <i class="bi bi-box-seam fs-1 text-slate-400 mb-3 d-block"></i>
+                                                <h6 class="text-slate-600 fw-bold">Nenhuma OS em andamento</h6>
+                                                <p class="text-slate-400 small mb-0">Clique em "Nova Solicitação" para criar.</p>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3">
+                        <div class="card border-0 shadow-sm rounded-2xl h-100 p-4">
+                            <h6 class="fw-bold text-dark text-uppercase tracking-wide mb-4"><i class="bi bi-clock text-primary me-2"></i> Recentes</h6>
+                            <div class="d-flex flex-column gap-3">
+                                {% for os in recentes %}
+                                <div class="bg-slate-50 border rounded-xl p-3 transition-colors cursor-pointer" 
+                                     data-os="{{ os.os_number }}"
+                                     data-status="{{ os.get_status_display }}"
+                                     data-origin="{{ os.origin_name }}"
+                                     data-date="{{ os.created_at|date:'d/m/Y H:i' }}"
+                                     onclick="openOSDetails(this)"
+                                     style="transition: 0.2s;" onmouseover="this.style.backgroundColor='#eff6ff'" onmouseout="this.style.backgroundColor='#f8fafc'">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <span class="font-monospace fw-bold small text-dark">{{ os.os_number }}</span>
+                                        <span class="text-slate-400" style="font-size: 0.65rem;">{{ os.created_at|date:"d/m" }}</span>
+                                    </div>
+                                    <p class="text-slate-600 small mb-2 text-truncate">{{ os.origin_name }}</p>
+                                    <span class="status-badge status-{{ os.status }}" style="font-size: 0.65rem;">{{ os.get_status_display }}</span>
+                                </div>
+                                {% empty %}
+                                <p class="text-center text-slate-400 small mt-4">Nenhum histórico recente.</p>
+                                {% endfor %}
+                            </div>
+                            <button class="btn btn-link text-primary text-decoration-none fw-bold w-100 mt-auto pt-4">Ver todo histórico</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div class="modal fade" id="osDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 rounded-2xl shadow-lg overflow-hidden">
+            <div class="modal-header bg-slate-900 text-white border-0 p-4">
+                <div>
+                    <h4 class="modal-title font-monospace fw-bold" id="modalOSNumber">OS-0000</h4>
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <span id="modalOSStatus" class="status-badge bg-light text-dark">Status</span>
+                        <span class="text-slate-400 small border-start border-secondary ps-2 ms-1" id="modalOSDate">Criada em --/--/----</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-slate-50">
+                <div class="card border border-slate-200 shadow-sm rounded-xl mb-4 p-4">
+                    <h6 class="text-slate-800 fw-bold text-uppercase mb-3 small"><i class="bi bi-geo-alt text-primary me-2"></i> Local de Coleta Registrado</h6>
+                    <div class="bg-light p-3 rounded-3 border">
+                        <p class="fw-bold text-dark mb-1" id="modalOSOrigin">Nome do Local</p>
+                        <p class="text-slate-500 small mb-0">Esta tela é um resumo. A distribuição completa de destinos é gerida pela Torre de Controle.</p>
+                    </div>
+                </div>
+
+                <div class="card border border-slate-200 shadow-sm rounded-xl p-4">
+                    <h6 class="text-slate-800 fw-bold text-uppercase mb-4 small"><i class="bi bi-clock-history text-primary me-2"></i> Linha do Tempo</h6>
+                    <div class="position-relative border-start border-2 border-secondary ms-2 ps-3 pb-2">
+                        <div class="position-absolute bg-primary rounded-circle" style="width: 12px; height: 12px; left: -7px; top: 0; border: 2px solid white;"></div>
+                        <p class="fw-bold text-dark small mb-0" id="modalTimelineStatus">Status Atual</p>
+                        <p class="text-slate-500" style="font-size: 0.75rem;">Última atualização registrada no sistema.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-white border-top p-3">
+                <button type="button" class="btn btn-light border fw-bold text-secondary px-4 rounded-3" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'orders/js/company_dashboard.js' %}"></script>
+{% endblock %}

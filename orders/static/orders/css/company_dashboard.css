@@ -1,0 +1,73 @@
+body { background-color: #f8fafc; }
+.bg-slate-900 { background-color: #0f172a; }
+.text-slate-400 { color: #94a3b8; }
+.text-slate-500 { color: #64748b; }
+.bg-slate-800 { background-color: #1e293b; }
+.rounded-xl { border-radius: 0.75rem; }
+.rounded-2xl { border-radius: 1rem; }
+.sidebar-link { color: #cbd5e1; transition: 0.2s; border-radius: 0.5rem; padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.75rem; text-decoration: none; font-weight: 500;}
+.sidebar-link:hover, .sidebar-link.active { background-color: rgba(37, 99, 235, 0.1); color: #60a5fa; }
+.metric-card { transition: transform 0.2s; cursor: default; overflow: hidden; }
+.metric-card:hover { transform: translateY(-3px); }
+.status-badge { padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; border: 1px solid transparent; }
+
+.status-PENDENTE { background: #fef08a; color: #b45309; border-color: #fde047; }
+.status-ACEITO, .status-COLETADO { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+.status-ENTREGUE { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+.status-CANCELADO { background: #f1f5f9; color: #64748b; text-decoration: line-through; }
+
+/* Correção de layout e responsividade */
+.dashboard-wrapper {
+    position: absolute; 
+    top: 0; 
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    overflow: hidden;
+    background-color: #f8fafc;
+    z-index: 10;
+}
+
+.sidebar-custom {
+    width: 260px;
+    background-color: #0f172a;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease;
+    z-index: 1050;
+    flex-shrink: 0;
+}
+
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+}
+
+@media (max-width: 991.98px) {
+    .sidebar-custom {
+        position: fixed;
+        top: 0; 
+        bottom: 0;
+        left: 0;
+        transform: translateX(-100%); 
+    }
+    .sidebar-custom.show {
+        transform: translateX(0); 
+    }
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1040;
+    }
+    .sidebar-overlay.show {
+        display: block;
+    }
+}
