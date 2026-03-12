@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+  .login-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg, #F8FAFC);
+  }
+  @media (min-width: 992px) {
+    .login-page { flex-direction: row; }
+  }
+  .login-brand {
+    background: linear-gradient(160deg, #0F172A 0%, #1E293B 50%, #334155 100%);
+    color: #fff;
+    padding: 2.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 42vh;
+  }
+  @media (min-width: 992px) {
+    .login-brand {
+      min-height: 100vh;
+      width: 44%;
+      padding: 3rem 3.5rem;
+    }
+  }
+  .login-brand-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  .login-brand-icon i { font-size: 2rem; color: #93C5FD; }
+  .login-brand h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+  }
+  .login-brand p {
+    color: rgba(226, 232, 240, 0.85);
+    font-size: 0.95rem;
+    margin-bottom: 0;
+    max-width: 320px;
+  }
+  .login-form-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+  }
+  @media (min-width: 992px) {
+    .login-form-wrap { padding: 3rem; }
+  }
+  .login-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--color-card, #fff);
+    border-radius: 20px;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.8);
+    padding: 2.25rem 2rem;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+  }
+  .login-card h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--color-primary, #0F172A);
+    margin-bottom: 0.35rem;
+  }
+  .login-card .subtitle {
+    color: var(--color-text-muted, #64748B);
+    font-size: 0.9rem;
+    margin-bottom: 1.75rem;
+  }
+  .login-page .form-control {
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
+  .login-page .form-control:focus {
+    border-color: #3B82F6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  }
+  .login-page .form-label {
+    font-weight: 600;
+    color: var(--color-text, #0F172A);
+    font-size: 0.875rem;
+    margin-bottom: 0.4rem;
+  }
+  .login-page .btn-entrar {
+    width: 100%;
+    padding: 0.85rem 1.5rem;
+    font-weight: 700;
+    font-size: 1rem;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(180deg, #1D4ED8 0%, #1E40AF 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(29, 78, 216, 0.4);
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+  }
+  .login-page .btn-entrar:hover {
+    background: linear-gradient(180deg, #2563EB 0%, #1D4ED8 100%);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(29, 78, 216, 0.45);
+  }
+  .login-page .alert-danger {
+    border-radius: 12px;
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    background: rgba(220, 38, 38, 0.06);
+    font-size: 0.9rem;
+  }
+</style>
+
+<div class="login-page font-sans">
+  <div class="login-brand">
+    <div class="login-brand-icon">
+      <i class="bi bi-box-seam-fill"></i>
+    </div>
+    <h1>JRJExpress</h1>
+    <p>Controle de ordens de serviço, despacho e rotas em um só lugar.</p>
+  </div>
+
+  <div class="login-form-wrap">
+    <div class="login-card">
+      <h2>Acesso ao sistema</h2>
+      <p class="subtitle">Entre com seu usuário e senha</p>
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-4" role="alert">
+          {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'login' %}">
+        {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        {% for field in form %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <input type="{{ field.field.widget.input_type }}"
+                   name="{{ field.name }}"
+                   id="{{ field.id_for_label }}"
+                   class="form-control"
+                   placeholder="{{ field.label }}"
+                   autocomplete="{% if field.name == 'username' %}username{% else %}current-password{% endif %}"
+                   required {% if field.name == 'username' %}autofocus{% endif %}>
+            {% if field.errors %}
+              <div class="form-text text-danger small mt-1">{{ field.errors.0 }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-entrar mt-2">
+          <i class="bi bi-box-arrow-in-right me-2"></i> Entrar
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
