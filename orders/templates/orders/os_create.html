@@ -6,20 +6,15 @@
 
 <div class="min-vh-100 bg-light pb-5" style="font-family: 'Segoe UI', system-ui, sans-serif;">
     
-    <header class="text-white pt-4 px-4 mb-4" style="background: linear-gradient(90deg, #041E14 0%, #0F5132 45%, #215a24 100%); padding-bottom: 5rem !important;">
+    <header class="bg-slate-900 text-white pt-5 pb-5 px-4 mb-4" style="padding-bottom: 5rem !important;">
         <div class="container d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-            
-            <div class="d-flex align-items-center gap-4">
-    
-                <img src="{% static 'passaro-Photoroom.ico' %}" alt="Logo JRJ Express" style="height: 80px; width: 80px; object-fit: contain; transform: scale(1.7); margin-left: 10px;">
-                
-                <div>
-                    <h2 class="mb-0 fw-bold text-white">Nova Ordem de Serviço</h2>
-                    <p class="text-white-50 fs-5 mb-0 mt-1">Preencha as informações abaixo para gerar a OS de entrega.</p>
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-truck fs-2 text-info"></i>
+                    <h2 class="mb-0 fw-bold">Nova Ordem de Serviço</h2>
                 </div>
-                
+                <p class="text-slate-400 fs-5 mb-0">Preencha as informações abaixo para gerar a OS de entrega.</p>
             </div>
-
         </div>
     </header>
 
@@ -78,14 +73,9 @@
             </div>
 
             <div class="card rounded-xl shadow-sm border-0 mb-4 overflow-hidden">
-                <div class="card-header-custom d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="icon-box"><i class="bi bi-box-arrow-up"></i></div>
-                        <h5 class="mb-0 fw-bold text-dark">Local de Coleta (Origem)</h5>
-                    </div>
-                    <button type="button" id="btnLoadOrigin" class="btn btn-sm btn-outline-primary fw-bold d-none" onclick="loadSavedOrigin()">
-                        <i class="bi bi-geo-alt"></i> Usar Endereço Salvo
-                    </button>
+                <div class="card-header-custom">
+                    <div class="icon-box"><i class="bi bi-box-arrow-up"></i></div>
+                    <h5 class="mb-0 fw-bold text-dark">Local de Coleta (Origem)</h5>
                 </div>
                 <div class="card-body p-4">
                     <div class="row g-3">
@@ -95,14 +85,7 @@
                         <div class="col-md-2"><input type="text" id="orig_number" class="form-control input-custom" placeholder="Número *" required></div>
                         <div class="col-md-5"><input type="text" id="orig_district" class="form-control input-custom" placeholder="Bairro *" required></div>
                         <div class="col-md-5"><input type="text" id="orig_city" class="form-control input-custom" placeholder="Cidade *" required></div>
-                        <div class="col-md-2"><input type="text" id="orig_state" class="form-control input-custom" placeholder="UF *" maxlength="2" required style="text-transform: uppercase;"></div>
-                    </div>
-                    
-                    <div class="form-check mt-3 pt-3 border-top">
-                        <input class="form-check-input cursor-pointer" type="checkbox" id="save_origin_check">
-                        <label class="form-check-label text-secondary small fw-bold cursor-pointer" for="save_origin_check">
-                            Salvar este endereço como padrão para as próximas OSs
-                        </label>
+                        <div class="col-md-2"><input type="text" id="orig_state" class="form-control input-custom" placeholder="UF *" maxlength="2" required></div>
                     </div>
                 </div>
             </div>

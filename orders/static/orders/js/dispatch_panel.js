@@ -188,24 +188,6 @@ function openDecisionModal(occurrenceId, osId, causaText, obsText, fotoUrl, caus
         if (el) el.value = '';
     });
 
-    const btnVoltarFila = document.getElementById('btnVoltarFila');
-    
-    const tipoParadaSeguro = String(stopType).trim().toUpperCase(); 
-    
-    console.log("O tipo de parada recebido é:", tipoParadaSeguro); 
-
-    if (btnVoltarFila) {
-        if (tipoParadaSeguro === 'COLETA') {
-            btnVoltarFila.classList.remove('d-none');
-            btnVoltarFila.style.display = 'block'; 
-        } else {
-            btnVoltarFila.classList.add('d-none');
-            btnVoltarFila.style.display = 'none'; 
-        }
-    } else {
-        console.error("ERRO: O botão com ID 'btnVoltarFila' não existe no HTML!");
-    }
-
     new bootstrap.Modal(document.getElementById('decisionModal')).show();
 }
 

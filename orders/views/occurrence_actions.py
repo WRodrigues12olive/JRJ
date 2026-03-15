@@ -17,63 +17,69 @@ def apply_reagendar(ocorrencia, user, operational_notes_extra=None):
     motoboy_da_parada = parada.motoboy
 
     if motoboy_da_parada:
+        # Novo comportamento: NÃO mexer na ordem global de todas as paradas.
+        # Apenas reposiciona o bloco desta OS (coleta + entregas/devoluções)
+        # para o final da rota do motoboy, preservando a OS atual em execução.
         with transaction.atomic():
-            if parada.stop_type == 'COLETA':
-                # Pega as entregas/devoluções que dependem EXCLUSIVAMENTE desta coleta
-                paradas_filhas = list(RouteStop.objects.filter(
-                    service_order=os_atual,
-                    motoboy=motoboy_da_parada,
-                    is_completed=False
-                ).exclude(id=parada.id).order_by('sequence'))
-                
-                # Lista de IDs que vamos mover para o fim (a coleta + as suas filhas)
-                ids_para_mover = [parada.id] + [p.id for p in paradas_filhas]
-                
-                # Descobre qual é a última sequência das OUTRAS paradas do motoboy (para não sobrepor)
-                outras_paradas = RouteStop.objects.filter(
-                    motoboy=motoboy_da_parada,
-                    is_completed=False
-                ).exclude(id__in=ids_para_mover)
-                
-                nova_seq = (outras_paradas.aggregate(Max('sequence'))['sequence__max'] or 0) + 1
-                
-                # 1. Joga a COLETA para o fim
-                RouteStop.objects.filter(id=parada.id).update(
-                    sequence=nova_seq,
-                    is_failed=False,
-                    bloqueia_proxima=False,
-                    status=RouteStop.StopStatus.PENDENTE,
-                    failure_reason=""
-                )
-                
-                # 2. Joga as entregas derivadas dela LOGO ABAIXO no fim
-                for p_filha in paradas_filhas:
-                    nova_seq += 1
-                    RouteStop.objects.filter(id=p_filha.id).update(sequence=nova_seq)
+            # 1) Descobre o grupo (raiz) desta OS
+            root_os_local = os_atual.parent_os or os_atual
 
-                # Destrava o alerta em cascata
+            # 2) Todas as paradas pendentes do grupo desta OS para este motoboy
+            grupo_ids = ServiceOrder.objects.filter(
+                Q(id=root_os_local.id) | Q(parent_os=root_os_local)
+            ).values_list('id', flat=True)
+
+            paradas_grupo = list(RouteStop.objects.filter(
+                motoboy=motoboy_da_parada,
+                service_order_id__in=grupo_ids,
+                is_completed=False
+            ).order_by('stop_type', 'sequence'))
+
+            # Garante que a parada da ocorrência está na lista
+            if parada not in paradas_grupo:
+                paradas_grupo.append(parada)
+
+            # Ordena de forma que COLETA da OS venha antes das ENTREGAS/DEVOLUCOES da própria OS
+            def _ord_key(p):
+                prioridade_tipo = 0
+                if p.stop_type == 'COLETA':
+                    prioridade_tipo = 0
+                elif p.stop_type in ['ENTREGA', 'DEVOLUCAO']:
+                    prioridade_tipo = 1
+                else:
+                    prioridade_tipo = 2
+                return (prioridade_tipo, p.sequence or 0, p.id)
+
+            paradas_grupo.sort(key=_ord_key)
+
+            # 3) MAIOR sequência entre as paradas que NÃO são desta OS (para não incluir as que vamos reposicionar)
+            # Assim a OS que o motoboy já iniciou nunca é ultrapassada pela OS que o despachante acabou de resolver.
+            max_seq_global = RouteStop.objects.filter(
+                motoboy=motoboy_da_parada,
+                is_completed=False,
+                sequence__lt=900
+            ).exclude(service_order_id__in=grupo_ids).aggregate(Max('sequence'))['sequence__max'] or 0
+
+            # 4) Joga o bloco desta OS para DEPOIS de tudo que já existe
+            nova_seq_base = max_seq_global + 1
+            for idx, p in enumerate(paradas_grupo):
+                is_target = (p.id == parada.id)
+                nova_seq = nova_seq_base + idx
+                RouteStop.objects.filter(id=p.id).update(
+                    sequence=nova_seq,
+                    is_failed=False if is_target else p.is_failed,
+                    bloqueia_proxima=False if is_target else p.bloqueia_proxima,
+                    status=RouteStop.StopStatus.PENDENTE if is_target else p.status,
+                    failure_reason="" if is_target else p.failure_reason
+                )
+
+            # 5) Se o problema foi na COLETA, limpa a flag de bloqueio das entregas dessa mesma OS
+            if parada.stop_type == 'COLETA':
                 RouteStop.objects.filter(
-                    service_order=os_atual,
+                    service_order=parada.service_order,
                     is_completed=False,
                     failure_reason__icontains="Coleta desta OS falhou"
                 ).update(is_failed=False, failure_reason="")
-
-            else:
-                # Se não for Coleta (ex: Entrega que o cliente não atendeu), joga só ela pro final
-                outras_paradas = RouteStop.objects.filter(
-                    motoboy=motoboy_da_parada,
-                    is_completed=False
-                ).exclude(id=parada.id)
-                
-                nova_seq = (outras_paradas.aggregate(Max('sequence'))['sequence__max'] or 0) + 1
-                
-                RouteStop.objects.filter(id=parada.id).update(
-                    sequence=nova_seq,
-                    is_failed=False,
-                    bloqueia_proxima=False,
-                    status=RouteStop.StopStatus.PENDENTE,
-                    failure_reason=""
-                )
     else:
         parada.is_failed = False
         parada.bloqueia_proxima = False
@@ -104,61 +110,32 @@ def apply_reagendar(ocorrencia, user, operational_notes_extra=None):
 
 
 def apply_voltar_fila(ocorrencia, user):
-    """Devolve APENAS a OS que falhou à fila e desmembra se estiver agrupada."""
-    os_alvo = ocorrencia.service_order
-    parada = ocorrencia.parada
-
-    # 1. Trava de Segurança Máxima: Só permite voltar para fila se for COLETA
-    if parada.stop_type != 'COLETA':
-        # Se um despachante tentar forçar (burlando o HTML), o sistema converte para "Retornar Base"
-        ocorrencia.resolvida = True
-        ocorrencia.save()
-        return
-
-    with transaction.atomic():
-        # 2. Desmembramento Inteligente
-        if os_alvo.parent_os:
-            # Se for a OS 02 (filha), apenas cortamos o laço com a mãe (OS 01)
-            os_alvo.parent_os = None
-        else:
-            # Se for a OS 01 (mãe) que falhou, temos que promover uma das filhas a nova mãe
-            filhas = list(ServiceOrder.objects.filter(parent_os=os_alvo))
-            if filhas:
-                nova_mae = filhas.pop(0) # Pega a primeira filha
-                nova_mae.parent_os = None
-                nova_mae.save()
-                # Atualiza as outras filhas para apontarem para a nova mãe
-                for f in filhas:
-                    f.parent_os = nova_mae
-                    f.save()
-
-        # 3. Reseta APENAS a OS que falhou
-        os_alvo.status = 'PENDENTE'
-        os_alvo.motoboy = None
-        os_alvo.operational_notes += f"\n[🔄 VOLTOU À FILA] Coleta falhou. A OS retornou para Aguardando. Motivo: {ocorrencia.get_causa_display()}."
-        os_alvo.save()
-
-        # 4. Reseta APENAS as paradas DESTA OS
-        RouteStop.objects.filter(
-            service_order=os_alvo,
-            is_completed=False
-        ).update(
-            motoboy=None,
-            is_failed=False,
-            failure_reason="",
-            status=RouteStop.StopStatus.PENDENTE,
-            bloqueia_proxima=False
-        )
-
-        # 5. Reseta os itens DESTA OS
-        OSItem.objects.filter(
-            order=os_alvo,
-            posse_atual=ocorrencia.motoboy
-        ).update(status=OSItem.ItemStatus.NAO_COLETADO, posse_atual=None)
-
-        DispatcherDecision.objects.create(
-            occurrence=ocorrencia, acao='VOLTAR_FILA',
-            detalhes="Coleta com problema. OS desmembrada e devolvida para a fila individualmente.", decidido_por=user
-        )
-        ocorrencia.resolvida = True
-        ocorrencia.save()
+    """Devolve a OS à fila (desvincula motoboy, reseta paradas e itens)."""
+    os_atual = ocorrencia.service_order
+    root_os = os_atual.parent_os or os_atual
+    grouped_orders = ServiceOrder.objects.filter(Q(id=root_os.id) | Q(parent_os=root_os))
+    root_os.status = 'PENDENTE'
+    root_os.motoboy = None
+    root_os.operational_notes += f"\n[🔄 VOLTOU À FILA] A OS retornou para Aguardando. Motivo: {ocorrencia.get_causa_display()}."
+    root_os.save()
+    grouped_orders.exclude(id=root_os.id).update(status='PENDENTE', motoboy=None)
+    RouteStop.objects.filter(
+        service_order__in=grouped_orders,
+        is_completed=False
+    ).update(
+        motoboy=None,
+        is_failed=False,
+        failure_reason="",
+        status=RouteStop.StopStatus.PENDENTE,
+        bloqueia_proxima=False
+    )
+    OSItem.objects.filter(
+        order__in=grouped_orders,
+        posse_atual=ocorrencia.motoboy
+    ).update(status=OSItem.ItemStatus.NAO_COLETADO, posse_atual=None)
+    DispatcherDecision.objects.create(
+        occurrence=ocorrencia, acao='VOLTAR_FILA',
+        detalhes="Motoboy desvinculado. OS devolvida para a fila Aguardando.", decidido_por=user
+    )
+    ocorrencia.resolvida = True
+    ocorrencia.save()

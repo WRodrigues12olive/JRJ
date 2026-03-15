@@ -7,7 +7,7 @@ from decimal import Decimal
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Subquery
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
@@ -16,6 +16,7 @@ from django.views.decorators.http import require_POST
 
 from logistics.models import MotoboyProfile
 from logistics.validators import validate_cnh, validate_plate, clean_cnh, clean_plate
+
 from orders.models import (
     RouteStop,
     ServiceOrder,
@@ -23,6 +24,16 @@ from orders.models import (
     ItemDistribution,
     Occurrence,
 )
+
+# Paradas de ENTREGA que contam para valor: concluída OU já teve ocorrência (não-ACIDENTE). Valor não some após despachante resolver.
+def _q_entregas_que_contam_valor():
+    """Uma vez que o motoboy reportou (não-ACIDENTE), o valor permanece mesmo após REAGENDAR/RETORNAR."""
+    paradas_com_ocorrencia_nao_acidente = Subquery(
+        Occurrence.objects.exclude(causa=Occurrence.Causa.ACIDENTE).values_list('parada_id', flat=True).distinct()
+    )
+    return Q(stop_type__in=['ENTREGA', 'DEVOLUCAO']) & (
+        Q(is_completed=True) | Q(id__in=paradas_com_ocorrencia_nao_acidente)
+    )
 
 from django.contrib import messages
 
@@ -59,7 +70,12 @@ def motoboy_tasks_view(request):
         is_completed=False
     ).exclude(sequence=999).order_by('sequence').first()
 
-    os_em_execucao_id = proxima_parada_global.service_order.id if proxima_parada_global else None
+    # OS "em execução" = raiz da parada com menor sequência (evita confundir OS raiz com filha)
+    if proxima_parada_global:
+        root_da_proxima = proxima_parada_global.service_order.parent_os or proxima_parada_global.service_order
+        os_em_execucao_id = root_da_proxima.id
+    else:
+        os_em_execucao_id = None
 
     ativas_data = []
     for os in ativas_qs:
@@ -81,58 +97,30 @@ def motoboy_tasks_view(request):
             'eh_a_atual': (os.id == os_em_execucao_id)
         })
 
-    ativas_data.sort(key=lambda x: (x['ta_pausada'], not x['eh_a_atual'], x['os'].created_at))
-    hoje_local = timezone.localtime(timezone.now()).date()
-    
-    # --- CORREÇÃO AQUI: ADICIONADO is_failed=False ---
-    # 1. Busca paradas concluídas com SUCESSO absoluto (Entregas e Devoluções)
-    concluidas_qs = RouteStop.objects.filter(
-        motoboy=perfil,
-        stop_type__in=['ENTREGA', 'DEVOLUCAO'],
-        is_completed=True,
-        is_failed=False,  # Impede de contabilizar quando o despachante encerra a falha
-        completed_at__date=hoje_local
-    ).select_related('destination', 'service_order').prefetch_related('service_order__destinations')
+    # Regra: mais antigas primeiro — lista por data de criação (e pausadas agrupadas)
+    ativas_data.sort(key=lambda x: (x['ta_pausada'], x['os'].created_at))
+    hoje = timezone.now().date()
+    q_entregas_valor = _q_entregas_que_contam_valor() & Q(motoboy=perfil)
+    # Data: concluídas usam completed_at (valor conta no dia da entrega); só não concluídas usam data da ocorrência
+    paradas_ocorrencia_hoje = Subquery(
+        Occurrence.objects.exclude(causa=Occurrence.Causa.ACIDENTE).filter(criado_em__date=hoje).values_list('parada_id', flat=True)
+    )
+    q_hoje = q_entregas_valor & (
+        (Q(is_completed=True) & Q(completed_at__date=hoje)) |
+        (Q(is_completed=False) & Q(id__in=paradas_ocorrencia_hoje))
+    )
+    entregas_concluidas_hoje = RouteStop.objects.filter(q_hoje).distinct().count()
 
-    # 2. Busca tentativas que falharam, mas que geraram ocorrência (exceto Acidente)
-    ocorrencias_qs = Occurrence.objects.filter(
-        motoboy=perfil,
-        parada__stop_type__in=['ENTREGA', 'DEVOLUCAO'],
-        criado_em__date=hoje_local
-    ).exclude(causa='ACIDENTE').select_related('parada__destination', 'parada__service_order').prefetch_related('parada__service_order__destinations')
-
-    valor_bruto_dia = Decimal('0.00')
-    entregas_concluidas_hoje = 0
-
-    # Soma os valores das entregas/devoluções bem sucedidas
-    for stop in concluidas_qs:
-        entregas_concluidas_hoje += 1
-        if stop.destination:
-            valor_bruto_dia += stop.destination.delivery_value or Decimal('0.00')
-        elif stop.stop_type == 'DEVOLUCAO':
-            dest = stop.service_order.destinations.first()
-            if dest:
-                valor_bruto_dia += dest.delivery_value or Decimal('0.00')
-
-    # Soma os valores das tentativas válidas (ocorrências reportadas no local)
-    for oc in ocorrencias_qs:
-        entregas_concluidas_hoje += 1
-        stop = oc.parada
-        if stop.destination:
-            valor_bruto_dia += stop.destination.delivery_value or Decimal('0.00')
-        elif stop.stop_type == 'DEVOLUCAO':
-            dest = stop.service_order.destinations.first()
-            if dest:
-                valor_bruto_dia += dest.delivery_value or Decimal('0.00')
+    ids_hoje = list(RouteStop.objects.filter(q_hoje).values_list('id', flat=True).distinct())
+    valor_bruto_dia = RouteStop.objects.filter(id__in=ids_hoje).aggregate(
+        total=Sum('destination__delivery_value')
+    )['total'] or Decimal('0.00')
 
     if perfil.category == 'TELE':
         percentagem = Decimal(str(perfil.delivery_percentage or '100.00'))
         total_valor_dia = valor_bruto_dia * (percentagem / Decimal('100.00'))
     elif perfil.category == 'DIARIA':
-        if entregas_concluidas_hoje > 0:
-            total_valor_dia = Decimal(str(perfil.daily_rate or '0.00'))
-        else:
-            total_valor_dia = Decimal('0.00')
+        total_valor_dia = Decimal(str(perfil.daily_rate or '0.00'))
     elif perfil.category == 'MENSAL':
         total_valor_dia = Decimal(str(perfil.monthly_rate or '0.00'))
     else:
@@ -144,109 +132,6 @@ def motoboy_tasks_view(request):
     is_absent = getattr(perfil, 'is_absent', False)
     is_online = perfil.is_available and bool(last_seen) and not is_absent
     presence_status = 'online' if is_online else ('ausente' if is_absent else 'offline')
-
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        orders_json = []
-        for data in ativas_data:
-            os_obj = data['os']
-            stops_json = []
-            for stop in data['stops']:
-                # Mapeamento do Endereço
-                if stop.stop_type == 'COLETA':
-                    name = os_obj.origin_name
-                    address = f"{os_obj.origin_street or ''}, {os_obj.origin_number or ''} - {os_obj.origin_district or ''}".strip(' ,-')
-                    comp = os_obj.origin_complement or ''
-                    ref = os_obj.origin_reference or ''
-                    contact = os_obj.origin_phone
-                elif stop.stop_type == 'ENTREGA':
-                    dest = stop.destination
-                    name = dest.destination_name if dest else 'Destino Indefinido'
-                    address = f"{dest.destination_street or ''}, {dest.destination_number or ''} - {dest.destination_district or ''}".strip(' ,-') if dest else ''
-                    comp = dest.destination_complement or '' if dest else ''
-                    ref = dest.destination_reference or '' if dest else 'Sem referência'
-                    contact = dest.destination_phone if dest else '--'
-                elif stop.stop_type == 'TRANSFERENCIA':
-                    name = "Ponto de Encontro"
-                    address = stop.custom_address or ''
-                    comp = stop.custom_complement or ''
-                    ref = "Sem referência"
-                    contact = "--"
-                else: # DEVOLUCAO
-                    name = "Local de Devolução"
-                    address = stop.custom_address or ''
-                    comp = stop.custom_complement or ''
-                    ref = "Sem referência"
-                    contact = "--"
-
-                # Mapeamento de Regras de Bloqueio 
-                is_waiting_rescue = False
-                if stop.failure_reason and '[AGUARDANDO SOCORRO]' in stop.failure_reason and not stop.is_completed:
-                    is_waiting_rescue = True
-                elif stop.custom_address and 'AGUARDE' in stop.custom_address and not stop.is_completed:
-                    is_waiting_rescue = True
-                    
-                is_frozen = False
-                if stop.failure_reason and stop.bloqueia_proxima and not stop.is_completed and '[AGUARDANDO SOCORRO]' not in stop.failure_reason:
-                    is_frozen = True
-
-                # Mapeamento dos Itens do Roteiro
-                items_json = []
-                if stop.stop_type == 'ENTREGA' and stop.destination:
-                    for dist in stop.destination.distributed_items.all():
-                        items_json.append({'desc': dist.item.description, 'qty': dist.quantity_allocated, 'type': dist.item.item_type or 'Item'})
-                elif stop.stop_type == 'COLETA':
-                    for item in os_obj.items.all():
-                        items_json.append({'desc': item.description, 'qty': item.total_quantity, 'type': item.item_type or 'Item'})
-                else:
-                    for dest in os_obj.destinations.all():
-                        if not dest.is_delivered:
-                            for dist in dest.distributed_items.all():
-                                items_json.append({'desc': f"{dist.item.description} (Retorno)", 'qty': dist.quantity_allocated, 'type': dist.item.item_type or 'Pacote'})
-                    if data['has_children']:
-                        for child in os_obj.child_orders.all():
-                            for dest in child.destinations.all():
-                                if not dest.is_delivered:
-                                    for dist in dest.distributed_items.all():
-                                        items_json.append({'desc': f"{dist.item.description} (Retorno)", 'qty': dist.quantity_allocated, 'type': dist.item.item_type or 'Pacote'})
-
-                stops_json.append({
-                    'id': str(stop.id),
-                    'type': stop.stop_type,
-                    'sequence': stop.sequence,
-                    'is_completed': stop.is_completed,
-                    'is_failed': stop.is_failed,
-                    'bloqueia_proxima': stop.bloqueia_proxima,
-                    'is_waiting_rescue': is_waiting_rescue,
-                    'is_frozen': is_frozen,
-                    'name': name,
-                    'address': address,
-                    'complement': comp,
-                    'reference': ref,
-                    'contact': contact,
-                    'os_origem': stop.service_order.os_number,
-                    'root_os_number': stop.service_order.parent_os.os_number if stop.service_order.parent_os else stop.service_order.os_number,
-                    'items_details': items_json
-                })
-                
-            orders_json.append({
-                'id': str(os_obj.id),
-                'os_number': os_obj.os_number,
-                'priority': os_obj.priority,
-                'priorityDisplay': os_obj.get_priority_display(),
-                'status': os_obj.status,
-                'has_children': data['has_children'],
-                'child_numbers': ", ".join(data['child_numbers']),
-                'stops': stops_json
-            })
-            
-        return JsonResponse({
-            'ativas_count': len(ativas_data),
-            'entregas_concluidas': entregas_concluidas_hoje,
-            'total_valor_dia': float(total_valor_dia),
-            'presence_status': presence_status,
-            'motoboy_is_available': perfil.is_available,
-            'orders': orders_json
-        })
 
     context = {
         'ativas_data': ativas_data,
@@ -320,63 +205,48 @@ def _motoboy_profile_context(request, perfil, is_first_access):
     end_date_str = request.GET.get('end_date')
     start_date = parse_date(start_date_str) if start_date_str else hoje_local
     end_date = parse_date(end_date_str) if end_date_str else hoje_local
-    
-    # --- CORREÇÃO AQUI: ADICIONADO is_failed=False na base do filtro ---
-    filter_concluidas = Q(motoboy=perfil, stop_type__in=['ENTREGA', 'DEVOLUCAO'], is_completed=True, is_failed=False)
-    filter_oc = Q(motoboy=perfil, parada__stop_type__in=['ENTREGA', 'DEVOLUCAO']) & ~Q(causa='ACIDENTE')
-
-    # Aplica os filtros de datas
+    q_base = _q_entregas_que_contam_valor() & Q(motoboy=perfil)
+    q_data = Q()
+    # Concluídas: data = completed_at (valor no dia da entrega). Só não concluídas usam data da ocorrência.
     if start_date:
-        filter_concluidas &= Q(completed_at__date__gte=start_date)
-        filter_oc &= Q(criado_em__date__gte=start_date)
+        paradas_ocorr_gte = Subquery(
+            Occurrence.objects.exclude(causa=Occurrence.Causa.ACIDENTE).filter(criado_em__date__gte=start_date).values_list('parada_id', flat=True)
+        )
+        q_data &= (
+            (Q(is_completed=True) & Q(completed_at__date__gte=start_date)) |
+            (Q(is_completed=False) & Q(id__in=paradas_ocorr_gte))
+        )
     if end_date:
-        filter_concluidas &= Q(completed_at__date__lte=end_date)
-        filter_oc &= Q(criado_em__date__lte=end_date)
-        
-    concluidas_qs = RouteStop.objects.filter(filter_concluidas).select_related('destination', 'service_order').prefetch_related('service_order__destinations')
-    ocorrencias_qs = Occurrence.objects.filter(filter_oc).select_related('parada__destination', 'parada__service_order').prefetch_related('parada__service_order__destinations')
-    
-    qtd_entregas_periodo = 0
-    valor_bruto_periodo = Decimal('0.00')
-    dias_trabalhados_set = set()
-
-    for stop in concluidas_qs:
-        qtd_entregas_periodo += 1
-        if stop.completed_at:
-            dias_trabalhados_set.add(stop.completed_at.date())
-            
-        if stop.destination:
-            valor_bruto_periodo += stop.destination.delivery_value or Decimal('0.00')
-        elif stop.stop_type == 'DEVOLUCAO':
-            dest = stop.service_order.destinations.first()
-            if dest:
-                valor_bruto_periodo += dest.delivery_value or Decimal('0.00')
-
-    for oc in ocorrencias_qs:
-        qtd_entregas_periodo += 1
-        if oc.criado_em:
-            dias_trabalhados_set.add(oc.criado_em.date())
-            
-        stop = oc.parada
-        if stop.destination:
-            valor_bruto_periodo += stop.destination.delivery_value or Decimal('0.00')
-        elif stop.stop_type == 'DEVOLUCAO':
-            dest = stop.service_order.destinations.first()
-            if dest:
-                valor_bruto_periodo += dest.delivery_value or Decimal('0.00')
-
-    # Cálculo final com base na categoria
+        paradas_ocorr_lte = Subquery(
+            Occurrence.objects.exclude(causa=Occurrence.Causa.ACIDENTE).filter(criado_em__date__lte=end_date).values_list('parada_id', flat=True)
+        )
+        q_data &= (
+            (Q(is_completed=True) & Q(completed_at__date__lte=end_date)) |
+            (Q(is_completed=False) & Q(id__in=paradas_ocorr_lte))
+        )
+    filter_q = q_base & q_data if q_data else q_base
+    entregas_periodo = RouteStop.objects.filter(filter_q).distinct()
+    qtd_entregas_periodo = entregas_periodo.count()
+    ids_periodo = list(entregas_periodo.values_list('id', flat=True))
+    valor_bruto_periodo = RouteStop.objects.filter(id__in=ids_periodo).aggregate(
+        total=Sum('destination__delivery_value')
+    )['total'] or Decimal('0.00')
     if perfil.category == 'TELE':
         percentagem = Decimal(str(perfil.delivery_percentage or '100.00'))
         total_valor_periodo = valor_bruto_periodo * (percentagem / Decimal('100.00'))
     elif perfil.category == 'DIARIA':
-        dias_trabalhados = len(dias_trabalhados_set)
+        dias_completos = set(RouteStop.objects.filter(filter_q, is_completed=True).values_list('completed_at__date', flat=True).distinct())
+        dias_ocorrencias = set(
+            Occurrence.objects.exclude(causa=Occurrence.Causa.ACIDENTE).filter(
+                parada__motoboy=perfil, parada__stop_type__in=['ENTREGA', 'DEVOLUCAO'], parada__is_completed=False
+            ).filter(criado_em__date__gte=start_date, criado_em__date__lte=end_date).values_list('criado_em__date', flat=True).distinct()
+        )
+        dias_trabalhados = len(dias_completos | dias_ocorrencias)
         total_valor_periodo = Decimal(str(perfil.daily_rate or '0.00')) * dias_trabalhados
     elif perfil.category == 'MENSAL':
         total_valor_periodo = Decimal(str(perfil.monthly_rate or '0.00'))
     else:
         total_valor_periodo = Decimal('0.00')
-        
     return {
         'perfil': perfil,
         'is_first_access': is_first_access,
@@ -385,6 +255,7 @@ def _motoboy_profile_context(request, perfil, is_first_access):
         'qtd_entregas_periodo': qtd_entregas_periodo,
         'total_valor_periodo': total_valor_periodo,
     }
+
 
 @login_required
 @require_POST

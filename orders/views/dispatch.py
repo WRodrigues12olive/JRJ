@@ -133,9 +133,15 @@ def resolve_occurrence_view(request, occurrence_id):
             parada.status = RouteStop.StopStatus.COM_OCORRENCIA
             parada.save()
 
-            # 2. Desbloqueia as paradas pendentes desse motoboy
+            # 2. Desbloqueia apenas as paradas pendentes relacionadas a este grupo de OS
             motoboy = ocorrencia.motoboy
-            motoboy.route_stops.filter(is_completed=False).update(is_failed=False, bloqueia_proxima=False, failure_reason="")
+            root_os = os_atual.parent_os or os_atual
+            grouped_orders = ServiceOrder.objects.filter(Q(id=root_os.id) | Q(parent_os=root_os))
+            RouteStop.objects.filter(
+                motoboy=motoboy,
+                service_order__in=grouped_orders,
+                is_completed=False
+            ).update(is_failed=False, bloqueia_proxima=False, failure_reason="")
 
             # 3. Calcula a sequência (Onde a devolução vai entrar)
             if is_priority:
@@ -147,16 +153,20 @@ def resolve_occurrence_view(request, occurrence_id):
                 sequence_to_use = ultima + 1
 
             # 4. Cria a parada de DEVOLUÇÃO
-            RouteStop.objects.create(
-                service_order=os_atual,
-                motoboy=motoboy,
-                stop_type='DEVOLUCAO',
-                sequence=sequence_to_use,
-                custom_address=f"Devolver em: {endereco_retorno}",
-                custom_complement=complemento_retorno,
-                status='PENDENTE',
-                bloqueia_proxima=False
-            )
+            devolucao_payload = {
+                "service_order": os_atual,
+                "motoboy": motoboy,
+                "stop_type": 'DEVOLUCAO',
+                "sequence": sequence_to_use,
+                "custom_address": f"Devolver em: {endereco_retorno}",
+                "custom_complement": complemento_retorno,
+                "status": 'PENDENTE',
+                "bloqueia_proxima": False
+            }
+            if parada.stop_type == 'ENTREGA' and parada.destination:
+                devolucao_payload['destination'] = parada.destination
+            
+            RouteStop.objects.create(**devolucao_payload)
 
             # 5. Resolve a ocorrência e atualiza logs
             DispatcherDecision.objects.create(
@@ -342,7 +352,7 @@ def get_route_stops(request, os_id):
             location = "Ponto de Transferência" if stop.stop_type == 'TRANSFERENCIA' else "Devolução"
             address = stop.custom_address.replace("Devolver em: ", "") if stop.custom_address else "Endereço não informado"
             complemento = stop.custom_complement if stop.custom_complement else ""
-            valor = 0.00
+            valor = float(stop.destination.delivery_value) if stop.destination and stop.destination.delivery_value else 0.00
 
         else:
             location = stop.destination.destination_name if stop.destination else "Indefinido"
@@ -479,7 +489,10 @@ def assign_motoboy_view(request, os_id):
             child_orders = ServiceOrder.objects.filter(parent_os=os)
             child_orders.update(motoboy=motoboy, status='ACEITO')
 
-            last_seq = motoboy.route_stops.filter(is_completed=False).count()
+            # Regra: mais antigas primeiro — nova OS sempre no FINAL da rota (maior sequência)
+            last_seq = RouteStop.objects.filter(
+                motoboy=motoboy, is_completed=False, sequence__lt=900
+            ).aggregate(Max('sequence'))['sequence__max'] or 0
 
             stops = RouteStop.objects.filter(
                 Q(service_order=os) | Q(service_order__parent_os=os)

@@ -7,10 +7,11 @@
 
 <div class="min-h-screen flex font-sans text-slate-800 selection:bg-blue-200" style="margin: -1.5rem; background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 45%, #f9fafb 100%);">
   
-  <aside id="mobile-menu" class="fixed inset-y-0 left-0 z-50 w-64 text-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0 -translate-x-full" style="background: linear-gradient(180deg, #041E14 0%, #0F5132 45%, #215a24 100%);">
-    <div class="flex items-center justify-center h-24">
-      <div class="flex items-center justify-center w-full px-4">
-        <img src="{% static 'passaro-Photoroom.ico' %}" alt="Logo JRJ Express" class="max-h-26 w-auto object-contain mt-16">
+  <aside id="mobile-menu" class="fixed inset-y-0 left-0 z-50 w-64 text-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0 -translate-x-full" style="background: linear-gradient(180deg, #020617 0%, #020617 35%, #0f172a 100%);">
+    <div class="flex items-center justify-center h-20 border-b border-white/10">
+      <div class="flex items-center gap-2 text-white font-bold text-xl tracking-tight">
+        <i class="bi bi-truck fs-3 text-white fs-4"></i>
+        <span>JRJ<span class="text-blue-400">Express</span></span>
       </div>
     </div>
     <nav class="p-4 space-y-1">
@@ -72,42 +73,28 @@
     <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-8 pb-24 custom-scrollbar">
       
       <section>
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+        <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
             <i class="bi bi-activity text-blue-600"></i> Resumo da Operação
           </h2>
-          
-          <form method="GET" class="flex gap-2 items-center bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-            <input type="hidden" name="tab" value="{{ request.GET.tab|default:'global' }}">
-            {% if request.GET.start_date %}<input type="hidden" name="start_date" value="{{ request.GET.start_date }}">{% endif %}
-            {% if request.GET.end_date %}<input type="hidden" name="end_date" value="{{ request.GET.end_date }}">{% endif %}
-            
-            <input type="date" name="start_date_resumo" value="{{ start_date_resumo }}" class="border-none bg-transparent text-sm text-slate-600 outline-none focus:ring-0 cursor-pointer px-2" required>
-            <span class="text-slate-400 text-sm">até</span>
-            <input type="date" name="end_date_resumo" value="{{ end_date_resumo }}" class="border-none bg-transparent text-sm text-slate-600 outline-none focus:ring-0 cursor-pointer px-2" required>
-            
-            <button type="submit" class="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 transition">Filtrar</button>
-            <a href="{% url 'admin_dashboard' %}" class="text-slate-400 hover:text-slate-600 px-2" title="Limpar Filtros Gerais"><i class="bi bi-eraser"></i></a>
-          </form>
         </div>
-        
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           
           <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden">
             <div class="absolute top-0 left-0 w-1 h-full bg-slate-400"></div>
-            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">OS Pendentes</p>
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pendentes</p>
             <h3 class="text-2xl font-bold text-slate-900">{{ kpis.pendentes }}</h3>
           </div>
 
           <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden group">
             <div class="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-            <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Entregas em Andamento</p>
+            <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Em Andamento</p>
             <h3 class="text-2xl font-bold text-slate-900">{{ kpis.em_andamento }}</h3>
           </div>
 
           <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden">
             <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-            <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Entregas Concluidas</p>
+            <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Entregues</p>
             <h3 class="text-2xl font-bold text-slate-900">{{ kpis.entregues }}</h3>
           </div>
 
@@ -119,7 +106,7 @@
 
           <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden">
             <div class="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
-            <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-1">OS Canceladas</p>
+            <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-1">Canceladas</p>
             <h3 class="text-2xl font-bold text-slate-900">{{ kpis.canceladas }}</h3>
           </div>
 
@@ -128,29 +115,16 @@
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <section class="lg:col-span-2 bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex flex-col">
-          <div class="flex flex-col sm:flex-row sm:items-start justify-between mb-4 gap-4">
+        <section class="lg:col-span-2 bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
             <div>
-              <h2 class="text-lg font-semibold text-slate-800">Evolução Diária de Entregas</h2>
-              <p class="text-sm text-slate-500">Total de entregas concluídas com sucesso no período (Máx 31 dias)</p>
+              <h2 class="text-lg font-semibold text-slate-800">Evolução Diária (Visão Semanal)</h2>
+              <p class="text-sm text-slate-500">Total de entregas concluídas com sucesso por dia</p>
             </div>
-            
-            <form method="GET" class="flex gap-2 items-center bg-slate-50 p-1.5 rounded-lg border border-slate-200 shadow-sm">
-                <input type="hidden" name="tab" value="{{ request.GET.tab|default:'global' }}">
-                {% if request.GET.start_date_resumo %}<input type="hidden" name="start_date_resumo" value="{{ request.GET.start_date_resumo }}">{% endif %}
-                {% if request.GET.end_date_resumo %}<input type="hidden" name="end_date_resumo" value="{{ request.GET.end_date_resumo }}">{% endif %}
-                {% if request.GET.start_date %}<input type="hidden" name="start_date" value="{{ request.GET.start_date }}">{% endif %}
-                {% if request.GET.end_date %}<input type="hidden" name="end_date" value="{{ request.GET.end_date }}">{% endif %}
-                
-                <input type="date" name="start_date_chart" value="{{ start_date_chart }}" class="border-none bg-transparent text-sm text-slate-600 outline-none focus:ring-0 cursor-pointer px-1" required>
-                <span class="text-slate-400 text-sm">até</span>
-                <input type="date" name="end_date_chart" value="{{ end_date_chart }}" class="border-none bg-transparent text-sm text-slate-600 outline-none focus:ring-0 cursor-pointer px-1" required>
-                
-                <button type="submit" class="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 transition"><i class="bi bi-arrow-repeat"></i> Atualizar</button>
-            </form>
+            <div class="p-2 bg-blue-50 rounded-lg text-blue-600"><i class="bi bi-bar-chart-fill fs-5"></i></div>
           </div>
           
-          <div class="relative h-64 w-full mt-2">
+          <div class="relative h-64 w-full mt-4">
             <canvas id="weeklyChart"></canvas>
           </div>
         </section>

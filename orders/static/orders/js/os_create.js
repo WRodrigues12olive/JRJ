@@ -70,40 +70,7 @@ let locIdCounter = 0;
 document.addEventListener("DOMContentLoaded", () => {
     addItem();
     addLocation();
-    checkSavedOrigin();
 });
-
-function checkSavedOrigin() {
-    const savedData = localStorage.getItem('defaultOriginAddress');
-    if (savedData) {
-        document.getElementById('btnLoadOrigin').classList.remove('d-none');
-    }
-}
-
-function loadSavedOrigin() {
-    try {
-        const data = JSON.parse(localStorage.getItem('defaultOriginAddress'));
-        if (data) {
-            document.getElementById('orig_name').value = data.name || '';
-            document.getElementById('orig_zip').value = data.zip || '';
-            document.getElementById('orig_street').value = data.street || '';
-            document.getElementById('orig_number').value = data.number || '';
-            document.getElementById('orig_district').value = data.district || '';
-            document.getElementById('orig_city').value = data.city || '';
-            document.getElementById('orig_state').value = data.state || '';
-            
-            const btn = document.getElementById('btnLoadOrigin');
-            btn.innerHTML = '<i class="bi bi-check2-all"></i> Preenchido!';
-            btn.classList.replace('btn-outline-primary', 'btn-success');
-            setTimeout(() => {
-                btn.innerHTML = '<i class="bi bi-geo-alt"></i> Usar Endereço Salvo';
-                btn.classList.replace('btn-success', 'btn-outline-primary');
-            }, 2000);
-        }
-    } catch (e) {
-        console.error("Erro ao carregar endereço salvo", e);
-    }
-}
 
 function addItem() {
     const template = document.getElementById('item-template');
@@ -389,19 +356,6 @@ function submitForm() {
         if (btnSubmit) {
             btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
             btnSubmit.disabled = true;
-        }
-
-        const saveOriginCheckbox = document.getElementById('save_origin_check');
-        if (saveOriginCheckbox && saveOriginCheckbox.checked) {
-            localStorage.setItem('defaultOriginAddress', JSON.stringify({
-                name: payload.origin_name,
-                zip: payload.origin_zip_code,
-                street: payload.origin_street,
-                number: payload.origin_number,
-                district: payload.origin_district,
-                city: payload.origin_city,
-                state: payload.origin_state
-            }));
         }
 
         const createUrl = OS_CREATE_CONFIG.createUrl || '/nova-os/';

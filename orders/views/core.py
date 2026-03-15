@@ -29,45 +29,17 @@ def root_redirect(request):
 def cancel_os_view(request, os_id):
     """Cancela uma OS (empresa dona ou despachante/admin)."""
     os = get_object_or_404(ServiceOrder, id=os_id)
-    
-    # 1. Regras específicas se quem está cancelando é a EMPRESA
-    if request.user.type == 'COMPANY':
-        if os.client != request.user:
-            return JsonResponse({'status': 'error', 'message': 'Você não tem permissão para cancelar esta OS.'}, status=403)
-        
-        # CORREÇÃO: A empresa SÓ pode cancelar se a OS não tiver saído da fila (PENDENTE)
-        if os.status != 'PENDENTE' or os.motoboy is not None:
-            return JsonResponse({
-                'status': 'error', 
-                'message': 'Esta OS já foi despachada para um motoboy e não pode mais ser cancelada pelo painel. Entre em contato com a central.'
-            }, status=400)
-            
-    # 2. Regras gerais (inclui Admin/Despachante tentando cancelar)
+    if request.user.type == 'COMPANY' and os.client != request.user:
+        return JsonResponse({'status': 'error', 'message': 'Você não tem permissão para cancelar esta OS.'}, status=403)
     if os.status in ['COLETADO', 'ENTREGUE']:
-        return JsonResponse({
-            'status': 'error', 
-            'message': 'Esta OS já está em rota com a mercadoria ou foi entregue e não pode ser cancelada.'
-        }, status=400)
-        
-    # 3. Executa o cancelamento
+        return JsonResponse({'status': 'error', 'message': 'Esta OS já está em rota ou foi entregue e não pode ser cancelada.'}, status=400)
     os.status = 'CANCELADO'
-    
-    # Prevenção extra: Se o despachante cancelar uma OS "ACEITA" (que já tinha motoboy atribuído),
-    # removemos as etapas do aplicativo do motoboy para não bugar a tela dele
-    if os.motoboy is not None:
-        RouteStop.objects.filter(service_order=os, is_completed=False).update(
-            motoboy=None,
-            is_failed=True, 
-            failure_reason="OS Cancelada pela Central"
-        )
-        
     os.motoboy = None
     os.save()
-    
     from django.contrib import messages
     messages.success(request, f'A OS {os.os_number} foi cancelada com sucesso.')
-    
     return JsonResponse({'status': 'success'})
+
 
 @login_required
 def dashboard(request):

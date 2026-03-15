@@ -4,17 +4,10 @@ let activeOs = null;
 let isInteracting = false;
 let isModalOpen = false;
 
-// Monitora interações no PC
 document.addEventListener('mousedown', () => isInteracting = true);
 document.addEventListener('mouseup', () => isInteracting = false);
-
-// Monitora interações no Celular
 document.addEventListener('touchstart', () => isInteracting = true);
 document.addEventListener('touchend', () => isInteracting = false);
-
-// A LINHA MÁGICA QUE RESOLVE O BUG: 
-// Libera a tela quando o celular transforma o toque em "rolagem da página"
-document.addEventListener('touchcancel', () => isInteracting = false);
 
 // ====================================================
 // REGRA DE OURO LOGÍSTICA (Bloqueio Inteligente)
@@ -61,8 +54,6 @@ function renderList() {
     let totalEntregasPendentes = 0; 
     container.innerHTML = '';
 
-    let primeiraOsLivreEncontrada = false;
-
     if (myOrders.length === 0) {
         container.innerHTML = `
             <div class="d-flex flex-column align-items-center justify-content-center h-100 text-slate-400 mt-5">
@@ -73,6 +64,15 @@ function renderList() {
         document.getElementById('kpi-entregas') && (document.getElementById('kpi-entregas').innerText = "0");
         return;
     }
+
+    // Descobre qual é a primeira OS que REALMENTE tem alguma parada acionável
+    let firstActionableIndex = null;
+    myOrders.forEach((os, index) => {
+        const hasAnyActionable = os.stops.some(s => isActionableStop(s, null, os.stops));
+        if (hasAnyActionable && firstActionableIndex === null) {
+            firstActionableIndex = index;
+        }
+    });
 
     myOrders.forEach((os, index) => {
         const entregasPendentes = os.stops.filter(isActionableStop).filter(s => s.type === 'ENTREGA');
@@ -95,17 +95,10 @@ function renderList() {
             iconBgClass = 'bg-info bg-opacity-10'; iconColorClass = 'text-info'; iconClass = 'bi-arrow-return-left';
         }
 
-        const isActionableAndNotFrozen = nextStop && !nextStop.is_frozen;
-        let isLocked = false;
-        
-        if (primeiraOsLivreEncontrada) {
-            isLocked = true;
-        } else if (isActionableAndNotFrozen) {
-            primeiraOsLivreEncontrada = true;
-            isLocked = false;
-        } else {
-            isLocked = false; 
-        }
+        const hasAnyActionable = os.stops.some(s => isActionableStop(s, null, os.stops));
+        // Nova regra: apenas as OS DEPOIS da primeira OS acionável ficam travadas.
+        // OS que estão totalmente congeladas/aguardando despachante não travam a nova OS normal.
+        const isLocked = firstActionableIndex !== null && index > firstActionableIndex && hasAnyActionable;
 
         const card = document.createElement('div');
         card.className = `bg-white p-3 rounded-4 shadow-sm border border-slate-200 mb-3 position-relative overflow-hidden transition-all ${isLocked ? 'opacity-75' : ''}`;
@@ -207,54 +200,39 @@ function renderList() {
 function autoRefreshMotoboy() {
     if (isInteracting || isModalOpen) return;
 
-    fetch(window.location.href, {
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest' // Avisa o Django para mandar só o JSON
-        }
-    })
-    .then(res => {
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-            return res.json();
-        } else {
-            throw new Error("Resposta não foi um JSON leve.");
-        }
-    })
-    .then(data => {
-        // 1. Atualiza as Variaveis Globais Instantaneamente
-        window.MOTOBOY_IS_AVAILABLE = data.motoboy_is_available;
-        window.MOTOBOY_ORDERS = data.orders;
-        myOrders = data.orders;
+    fetch(window.location.href)
+        .then(res => res.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
 
-        // 2. Atualiza os botões visuais (KPIs do topo)
-        const kpiAtivas = document.getElementById('kpi-os-ativas');
-        if (kpiAtivas) kpiAtivas.innerText = data.ativas_count;
-        
-        const paineis = document.querySelectorAll('.bg-slate-800');
-        if(paineis.length >= 4) {
-            // Atualiza Entregas Concluídas
-            const elConcluidas = paineis[2].querySelector('.text-success');
-            if (elConcluidas) elConcluidas.innerText = data.entregas_concluidas;
-            
-            // Atualiza Valor Total ganho no dia
-            const elValor = paineis[3].querySelector('.text-white.fs-5');
-            if (elValor) elValor.innerText = `R$ ${data.total_valor_dia.toFixed(2).replace('.', ',')}`;
-        }
-
-        // 3. Renderiza a lista de rotas novamente com os dados frescos
-        renderList();
-
-        // 4. MÁGICA VISUAL: Atualiza a tela de execução ao vivo se o motoboy estiver com ela aberta
-        if (document.getElementById('view-execution').classList.contains('active') && activeOs) {
-            const updatedOs = myOrders.find(o => o.id === activeOs.id);
-            if (updatedOs) {
-                openOS(updatedOs.id); 
-            } else {
-                closeOS(); 
+            const currentKpiRow = document.querySelector('.row.g-2.px-1.pb-2');
+            const newKpiRow = doc.querySelector('.row.g-2.px-1.pb-2');
+            if (currentKpiRow && newKpiRow) {
+                currentKpiRow.innerHTML = newKpiRow.innerHTML;
             }
-        }
-    })
-    .catch(err => console.log('Silencioso: Sincronização ignorada (Aguardando próxima).'));
+
+            const scripts = doc.querySelectorAll('script');
+            for (let s of scripts) {
+                if (s.innerText.includes('window.MOTOBOY_ORDERS =')) {
+                    eval(s.innerText);
+                    myOrders = window.MOTOBOY_ORDERS || []; 
+                    renderList(); 
+                    
+                    // MÁGICA VISUAL: Atualiza a tela de execução ao vivo sem piscar
+                    if (document.getElementById('view-execution').classList.contains('active') && activeOs) {
+                        const updatedOs = myOrders.find(o => o.id === activeOs.id);
+                        if (updatedOs) {
+                            openOS(updatedOs.id); 
+                        } else {
+                            closeOS(); 
+                        }
+                    }
+                    break;
+                }
+            }
+        })
+        .catch(err => console.log('Silencioso: falha na sincronização', err));
 }
 
 function abrirModalOcorrencia() {
@@ -266,6 +244,7 @@ function abrirModalOcorrencia() {
     const form = document.getElementById('occurrenceForm');
     form.action = `/minhas-entregas/problema/${currentStop.id}/`; 
     form.reset();
+    setupEvidencePhotoUI();
     handleCausaChange(); 
     
     new bootstrap.Modal(document.getElementById('occurrenceModal')).show();
@@ -297,6 +276,77 @@ function handleCausaChange() {
         obs.required = false;
         warning.classList.add('d-none');
         obs.classList.remove('border-danger');
+    }
+}
+
+function setupEvidencePhotoUI() {
+    const fileInput = document.querySelector('input[name="evidencia_foto"]');
+    if (!fileInput) return;
+    
+    // Se já existe o wrapper, apenas reseta visualmente
+    const existingWrapper = document.getElementById('evidencia-wrapper');
+    if (existingWrapper) {
+        resetEvidenceUI();
+        return;
+    }
+    
+    // Cria a estrutura visual igual ao POD
+    const wrapper = document.createElement('div');
+    wrapper.id = 'evidencia-wrapper';
+    wrapper.className = 'border border-2 border-secondary border-opacity-25 rounded-4 p-4 text-center bg-light mb-3 transition-all';
+    wrapper.style.borderStyle = 'dashed';
+    wrapper.style.cursor = 'pointer';
+    wrapper.onclick = () => fileInput.click();
+    
+    const icon = document.createElement('i');
+    icon.id = 'evidencia-icone';
+    icon.className = 'bi bi-camera fs-1 text-slate-300';
+    
+    const text = document.createElement('p');
+    text.id = 'evidencia-texto';
+    text.className = 'mb-0 mt-2 small fw-bold text-slate-400';
+    text.innerText = 'Toque para anexar foto (Opcional)';
+    
+    wrapper.appendChild(icon);
+    wrapper.appendChild(text);
+    
+    // Insere antes do input original e esconde o input
+    if (fileInput.parentNode) {
+        fileInput.parentNode.insertBefore(wrapper, fileInput);
+        fileInput.classList.add('d-none');
+    }
+    
+    // Adiciona listener para atualizar a UI quando selecionar arquivo
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            text.innerText = "Foto Anexada: " + e.target.files[0].name;
+            text.classList.replace('text-slate-400', 'text-success');
+            icon.className = 'bi bi-check-circle-fill fs-1 text-success';
+            wrapper.classList.replace('border-secondary', 'border-success');
+            wrapper.classList.remove('border-opacity-25');
+            wrapper.classList.add('bg-success', 'bg-opacity-10');
+        } else {
+            resetEvidenceUI();
+        }
+    });
+}
+
+function resetEvidenceUI() {
+    const text = document.getElementById('evidencia-texto');
+    const icon = document.getElementById('evidencia-icone');
+    const wrapper = document.getElementById('evidencia-wrapper');
+    
+    if (text) {
+        text.innerText = 'Toque para anexar foto (Opcional)';
+        text.classList.replace('text-success', 'text-slate-400');
+    }
+    if (icon) {
+        icon.className = 'bi bi-camera fs-1 text-slate-300';
+    }
+    if (wrapper) {
+        wrapper.classList.replace('border-success', 'border-secondary');
+        wrapper.classList.add('border-opacity-25');
+        wrapper.classList.remove('bg-success', 'bg-opacity-10');
     }
 }
 
@@ -554,51 +604,11 @@ function confirmarEtapa() {
     }
 }
 
-document.getElementById('proof_photo')?.addEventListener('change', async function(e) {
+document.getElementById('proof_photo')?.addEventListener('change', function(e) {
     if (e.target.files.length > 0) {
-        const file = e.target.files[0];
-        const textoEl = document.getElementById('foto-texto');
-        const iconeEl = document.getElementById('icone-camera');
-
-        // Aviso de carregamento enquanto o celular comprime
-        textoEl.innerText = "Otimizando imagem... aguarde.";
-        textoEl.className = "mb-0 small fw-bold mt-2 text-warning";
-        iconeEl.className = 'bi bi-hourglass-split fs-1 text-warning';
-
-        try {
-            // Comprime a foto (máx 1000px, 70% de qualidade)
-            const compressedFile = await compressImage(file, 1000, 0.7);
-            
-            // Substitui o arquivo pesado pelo arquivo leve no input original silenciosamente
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(compressedFile);
-            e.target.files = dataTransfer.files;
-
-            textoEl.innerText = "Foto Anexada (Otimizada): " + file.name;
-            textoEl.className = "mb-0 small fw-bold mt-2 text-success";
-            iconeEl.className = 'bi bi-check-circle-fill fs-1 text-success';
-        } catch (error) {
-            console.error("Erro ao comprimir imagem:", error);
-            // Se falhar (celular muito antigo), envia a original mesmo
-            textoEl.innerText = "Foto Anexada: " + file.name;
-            textoEl.className = "mb-0 small fw-bold mt-2 text-success";
-            iconeEl.className = 'bi bi-check-circle-fill fs-1 text-success';
-        }
-    }
-});
-
-// COMPRESSÃO: Foto de Evidência de Ocorrência
-document.getElementById('ocFoto')?.addEventListener('change', async function(e) {
-    if (e.target.files.length > 0) {
-        const file = e.target.files[0];
-        try {
-            const compressedFile = await compressImage(file, 1000, 0.7);
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(compressedFile);
-            e.target.files = dataTransfer.files;
-        } catch (error) {
-            console.error("Erro ao comprimir imagem da ocorrência:", error);
-        }
+        document.getElementById('foto-texto').innerText = "Foto Anexada: " + e.target.files[0].name;
+        document.getElementById('foto-texto').classList.replace('text-slate-400', 'text-success');
+        document.getElementById('icone-camera').className = 'bi bi-check-circle-fill fs-1 text-success';
     }
 });
 
@@ -699,45 +709,3 @@ document.addEventListener('DOMContentLoaded', () => {
         setPresence('AUSENTE');
     });
 });
-
-function compressImage(file, maxSize = 1000, quality = 0.7) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = event => {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => {
-                let width = img.width;
-                let height = img.height;
-
-                // Redimensiona mantendo a proporção
-                if (width > height && width > maxSize) {
-                    height = Math.round((height *= maxSize / width));
-                    width = maxSize;
-                } else if (height > maxSize) {
-                    width = Math.round((width *= maxSize / height));
-                    height = maxSize;
-                }
-
-                // Desenha a imagem menor no Canvas
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                // Converte de volta para Arquivo (JPEG)
-                canvas.toBlob(blob => {
-                    if (blob) {
-                        resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
-                    } else {
-                        reject(new Error("Falha na compressão"));
-                    }
-                }, 'image/jpeg', quality);
-            };
-            img.onerror = error => reject(error);
-        };
-        reader.onerror = error => reject(error);
-    });
-}

@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, Subquery
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -21,52 +21,13 @@ def admin_dashboard_view(request):
     """Dashboard do administrador: KPIs, visão global, alertas, ranking motoboys e empresas."""
     if not (request.user.type == 'ADMIN' or request.user.is_superuser):
         return redirect('root')
-    
-    hoje = timezone.now().date()
-
-    start_date_resumo_str = request.GET.get('start_date_resumo')
-    end_date_resumo_str = request.GET.get('end_date_resumo')
-
-    if start_date_resumo_str:
-        start_date_resumo = parse_date(start_date_resumo_str)
-    else:
-        start_date_resumo = hoje.replace(day=1) 
-
-    if end_date_resumo_str:
-        end_date_resumo = parse_date(end_date_resumo_str)
-    else:
-        end_date_resumo = hoje
 
     kpis = {
-        'pendentes': ServiceOrder.objects.filter(
-            status='PENDENTE',
-            created_at__date__gte=start_date_resumo,
-            created_at__date__lte=end_date_resumo
-        ).count(),
-        'em_andamento': RouteStop.objects.filter(
-            stop_type='ENTREGA', 
-            is_completed=False, 
-            service_order__status__in=['ACEITO', 'COLETADO'],
-            service_order__created_at__date__gte=start_date_resumo,
-            service_order__created_at__date__lte=end_date_resumo
-        ).count(),
-        'entregues': RouteStop.objects.filter(
-            stop_type='ENTREGA',
-            is_completed=True,
-            is_failed=False,
-            completed_at__date__gte=start_date_resumo,
-            completed_at__date__lte=end_date_resumo
-        ).count(),
-        'ocorrencias': ServiceOrder.objects.filter(
-            status__in=['OCORRENCIA', 'PROBLEM'],
-            created_at__date__gte=start_date_resumo,
-            created_at__date__lte=end_date_resumo
-        ).count(),
-        'canceladas': ServiceOrder.objects.filter(
-            status='CANCELADO',
-            created_at__date__gte=start_date_resumo,
-            created_at__date__lte=end_date_resumo
-        ).count(),
+        'pendentes': ServiceOrder.objects.filter(status='PENDENTE').count(),
+        'em_andamento': ServiceOrder.objects.filter(status__in=['ACEITO', 'COLETADO']).count(),
+        'entregues': ServiceOrder.objects.filter(status='ENTREGUE').count(),
+        'ocorrencias': ServiceOrder.objects.filter(status__in=['OCORRENCIA', 'PROBLEM']).count(),
+        'canceladas': ServiceOrder.objects.filter(status='CANCELADO').count(),
     }
 
     global_orders = ServiceOrder.objects.select_related('client', 'motoboy').order_by('-created_at')
@@ -77,85 +38,61 @@ def admin_dashboard_view(request):
 
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
-    start_date_obj = parse_date(start_date) if start_date else None
-    end_date_obj = parse_date(end_date) if end_date else None
+    # Entregas que contam: concluídas OU já tiveram ocorrência (não-ACIDENTE). Valor não some após despachante resolver.
+    paradas_com_ocorrencia_nao_acidente = Subquery(
+        Occurrence.objects.exclude(causa='ACIDENTE').values_list('parada_id', flat=True).distinct()
+    )
+    q_valor = Q(stop_type__in=['ENTREGA', 'DEVOLUCAO']) & (
+        Q(is_completed=True) | Q(id__in=paradas_com_ocorrencia_nao_acidente)
+    )
+    if start_date or end_date:
+        sd = parse_date(start_date) if start_date else None
+        ed = parse_date(end_date) if end_date else None
+        q_data = Q()
+        # Concluídas: data = completed_at. Só não concluídas usam data da ocorrência.
+        if sd:
+            q_data &= (
+                (Q(is_completed=True) & Q(completed_at__date__gte=sd)) |
+                (Q(is_completed=False) & Q(id__in=paradas_com_ocorrencia_nao_acidente) & Q(ocorrencias__criado_em__date__gte=sd))
+            )
+        if ed:
+            q_data &= (
+                (Q(is_completed=True) & Q(completed_at__date__lte=ed)) |
+                (Q(is_completed=False) & Q(id__in=paradas_com_ocorrencia_nao_acidente) & Q(ocorrencias__criado_em__date__lte=ed))
+            )
+        stops_ranking = RouteStop.objects.filter(q_valor, q_data).distinct().select_related('motoboy', 'destination')
+        from collections import defaultdict
+        by_mb = defaultdict(lambda: {'total_entregas': 0, 'valor_gerado': Decimal('0.00')})
+        for s in stops_ranking:
+            if s.motoboy_id:
+                by_mb[s.motoboy_id]['total_entregas'] += 1
+                by_mb[s.motoboy_id]['valor_gerado'] += (s.destination.delivery_value or Decimal('0.00'))
+        motoboys_ranking = list(MotoboyProfile.objects.filter(id__in=by_mb).select_related('user'))
+        for mb in motoboys_ranking:
+            mb.total_entregas = by_mb[mb.id]['total_entregas']
+            mb.valor_gerado = by_mb[mb.id]['valor_gerado']
+        motoboys_ranking.sort(key=lambda m: (m.valor_gerado or Decimal('0.00'), m.total_entregas), reverse=True)
+    else:
+        # Sem filtro de data: concluídas + paradas que já tiveram ocorrência (não-ACIDENTE)
+        filter_q = Q(route_stops__stop_type='ENTREGA') & (
+            Q(route_stops__is_completed=True) | Q(route_stops__id__in=paradas_com_ocorrencia_nao_acidente)
+        )
+        motoboys_ranking = MotoboyProfile.objects.select_related('user').annotate(
+            total_entregas=Count('route_stops', filter=filter_q, distinct=True),
+            valor_gerado=Sum('route_stops__destination__delivery_value', filter=filter_q)
+        ).order_by('-valor_gerado', '-total_entregas')
 
-    # 1. Filtros idênticos aos do Extrato do Motoboy
-    filter_concluidas = Q(stop_type__in=['ENTREGA', 'DEVOLUCAO'], is_completed=True, is_failed=False)
-    filter_oc = Q(parada__stop_type__in=['ENTREGA', 'DEVOLUCAO']) & ~Q(causa='ACIDENTE')
-
-    if start_date_obj:
-        filter_concluidas &= Q(completed_at__date__gte=start_date_obj)
-        filter_oc &= Q(criado_em__date__gte=start_date_obj)
-    if end_date_obj:
-        filter_concluidas &= Q(completed_at__date__lte=end_date_obj)
-        filter_oc &= Q(criado_em__date__lte=end_date_obj)
-
-    concluidas_qs = RouteStop.objects.filter(filter_concluidas).select_related('motoboy', 'destination', 'service_order').prefetch_related('service_order__destinations')
-    ocorrencias_qs = Occurrence.objects.filter(filter_oc).select_related('motoboy', 'parada__destination', 'parada__service_order').prefetch_related('parada__service_order__destinations')
-
-    motoboys = MotoboyProfile.objects.select_related('user').all()
-    dados_por_motoboy = {}
-    
-    for mb in motoboys:
-        dados_por_motoboy[mb.id] = {
-            'perfil': mb,
-            'total_entregas': 0,
-            'valor_gerado': Decimal('0.00'),
-            'dias_trabalhados_set': set()
-        }
-
-    # 2. Soma as Entregas e Devoluções de Sucesso
-    for stop in concluidas_qs:
-        if stop.motoboy_id not in dados_por_motoboy: continue
-        dados = dados_por_motoboy[stop.motoboy_id]
-        dados['total_entregas'] += 1
-        if stop.completed_at: dados['dias_trabalhados_set'].add(stop.completed_at.date())
-        
-        if stop.destination:
-            dados['valor_gerado'] += stop.destination.delivery_value or Decimal('0.00')
-        elif stop.stop_type == 'DEVOLUCAO':
-            dest = stop.service_order.destinations.first()
-            if dest: dados['valor_gerado'] += dest.delivery_value or Decimal('0.00')
-
-    # 3. Soma as Tentativas Válidas (Ocorrências de clientes ausentes, etc)
-    for oc in ocorrencias_qs:
-        if oc.motoboy_id not in dados_por_motoboy: continue
-        dados = dados_por_motoboy[oc.motoboy_id]
-        dados['total_entregas'] += 1
-        if oc.criado_em: dados['dias_trabalhados_set'].add(oc.criado_em.date())
-            
-        stop = oc.parada
-        if stop.destination:
-            dados['valor_gerado'] += stop.destination.delivery_value or Decimal('0.00')
-        elif stop.stop_type == 'DEVOLUCAO':
-            dest = stop.service_order.destinations.first()
-            if dest: dados['valor_gerado'] += dest.delivery_value or Decimal('0.00')
-
-    # 4. Aplica as regras de negócio de pagamento (Tele, Diária ou Mensal)
-    motoboys_ranking = []
-    for mb_id, dados in dados_por_motoboy.items():
-        mb = dados['perfil']
-        mb.total_entregas = dados['total_entregas']
-        mb.valor_gerado = dados['valor_gerado']
-        
+    for mb in motoboys_ranking:
+        val_gerado = mb.valor_gerado or Decimal('0.00')
+        percentagem = Decimal(str(mb.delivery_percentage or '100.00'))
         if mb.category == 'TELE':
-            percentagem = Decimal(str(mb.delivery_percentage or '100.00'))
-            mb.calculo_ganho = mb.valor_gerado * (percentagem / Decimal('100.00'))
+            mb.calculo_ganho = val_gerado * (percentagem / Decimal('100.00'))
         elif mb.category == 'DIARIA':
-            dias_trabalhados = len(dados['dias_trabalhados_set'])
-            mb.calculo_ganho = Decimal(str(mb.daily_rate or '0.00')) * dias_trabalhados
+            mb.calculo_ganho = Decimal(str(mb.daily_rate or '0.00'))
         elif mb.category == 'MENSAL':
             mb.calculo_ganho = Decimal(str(mb.monthly_rate or '0.00'))
         else:
             mb.calculo_ganho = Decimal('0.00')
-            
-        # CORREÇÃO: Adiciona TODOS os motoboys ao ranking, mesmo os que têm 0 entregas no período.
-        # Assim o painel mostra sempre a equipa completa!
-        motoboys_ranking.append(mb)
-        
-    # Ordena os que mais geraram valor e entregas para o topo
-    motoboys_ranking.sort(key=lambda x: (x.valor_gerado, x.total_entregas), reverse=True)
 
     companies = CustomUser.objects.filter(type='COMPANY').annotate(
         total_pedidos=Count('orders'),
@@ -164,45 +101,29 @@ def admin_dashboard_view(request):
     ).order_by('-total_pedidos')
 
     hoje = timezone.now().date()
-    start_date_chart_str = request.GET.get('start_date_chart')
-    end_date_chart_str = request.GET.get('end_date_chart')
-
-    end_date_chart = parse_date(end_date_chart_str) if end_date_chart_str else hoje
-    start_date_chart = parse_date(start_date_chart_str) if start_date_chart_str else end_date_chart - timedelta(days=6)
-
-    # Proteção: Garante que a data inicial não é maior que a final e limita a 31 dias
-    delta_days = (end_date_chart - start_date_chart).days
-    if delta_days < 0:
-        start_date_chart, end_date_chart = end_date_chart, start_date_chart
-        delta_days = (end_date_chart - start_date_chart).days
-    
-    if delta_days > 31: 
-        start_date_chart = end_date_chart - timedelta(days=31)
-        delta_days = 31
-
     weekly_data = []
     dias_semana = {0: 'Seg', 1: 'Ter', 2: 'Qua', 3: 'Qui', 4: 'Sex', 5: 'Sáb', 6: 'Dom'}
     max_entregas = 0
     dados_dias = []
-    
-    # Busca os dias no intervalo selecionado
-    for i in range(delta_days + 1):
-        data_alvo = start_date_chart + timedelta(days=i)
+    q_entregas_valor = Q(stop_type__in=['ENTREGA', 'DEVOLUCAO']) & (
+        Q(is_completed=True) | Q(id__in=paradas_com_ocorrencia_nao_acidente)
+    )
+    for i in range(6, -1, -1):
+        data_alvo = hoje - timedelta(days=i)
         total_dia = RouteStop.objects.filter(
-            stop_type='ENTREGA', is_completed=True, is_failed=False, completed_at__date=data_alvo
-        ).count()
+            q_entregas_valor,
+            (Q(is_completed=True) & Q(completed_at__date=data_alvo)) |
+            (Q(is_completed=False) & Q(id__in=paradas_com_ocorrencia_nao_acidente) & Q(ocorrencias__criado_em__date=data_alvo))
+        ).distinct().count()
         if total_dia > max_entregas:
             max_entregas = total_dia
         dados_dias.append({'data': data_alvo, 'total': total_dia})
-        
     for dado in dados_dias:
         altura = (dado['total'] / max_entregas * 100) if max_entregas > 0 else 0
         if altura == 0:
             altura = 2
-        # Formata o texto para exibir "Seg 12/05"
-        label_dia = f"{dias_semana[dado['data'].weekday()]} {dado['data'].strftime('%d/%m')}"
         weekly_data.append({
-            'day': label_dia,
+            'day': dias_semana[dado['data'].weekday()],
             'count': dado['total'],
             'height': altura
         })
@@ -216,10 +137,6 @@ def admin_dashboard_view(request):
         'start_date': start_date,
         'end_date': end_date,
         'weekly_data': weekly_data,
-        'start_date_resumo': start_date_resumo.strftime('%Y-%m-%d') if start_date_resumo else '',
-        'end_date_resumo': end_date_resumo.strftime('%Y-%m-%d') if end_date_resumo else '',
-        'start_date_chart': start_date_chart.strftime('%Y-%m-%d'),
-        'end_date_chart': end_date_chart.strftime('%Y-%m-%d'),
     }
     return render(request, 'orders/admin_dashboard.html', context)
 
@@ -233,25 +150,14 @@ def admin_os_management_view(request):
     query = request.GET.get('q', '')
     status_filter = request.GET.get('status', '')
     orders = ServiceOrder.objects.select_related('client', 'motoboy').all().order_by('-created_at')
-    
     if query:
         orders = orders.filter(
             Q(os_number__icontains=query) | Q(client__first_name__icontains=query) | Q(client__username__icontains=query)
         )
-        
     if status_filter:
-        if status_filter == 'EM_ROTA':
-            orders = orders.filter(status__in=['ACEITO', 'COLETADO'])
-        elif status_filter == 'COM_OCORRENCIA':
-            orders = orders.filter(
-                Q(status='OCORRENCIA') | Q(ocorrencias__resolvida=False)
-            ).distinct()
-        else:
-            orders = orders.filter(status=status_filter)
-            
+        orders = orders.filter(status=status_filter)
     paginator = Paginator(orders, 50)
     page_obj = paginator.get_page(request.GET.get('page'))
-    
     return render(request, 'orders/admin_os_management.html', {
         'page_obj': page_obj,
         'q': query,

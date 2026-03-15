@@ -8,22 +8,19 @@
 
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
-    <aside class="sidebar-custom shadow-lg" id="mainSidebar" style="background: linear-gradient(180deg, #041E14 0%, #0F5132 45%, #215a24 100%);">
-    
-        <div class="d-flex align-items-center justify-content-center px-4 pt-5 pb-3 position-relative">
-            
-            <img src="{% static 'passaro-Photoroom.ico' %}" alt="Logo JRJ Express" style="height: 80px; width: auto; object-fit: contain; transform: scale(1.5);">
-            
-            <button class="btn btn-link text-white d-lg-none position-absolute top-0 end-0 mt-3 me-3 p-0 text-decoration-none" onclick="toggleSidebar()">
-                <i class="bi bi-x-lg fs-4"></i>
+    <aside class="sidebar-custom shadow-lg" id="mainSidebar">
+        <div class="d-flex align-items-center px-4 py-4 border-bottom border-secondary border-opacity-25" style="height: 80px;">
+            <i class="bi bi-truck fs-3 text-primary me-3"></i>
+            <span class="fs-5 fw-bold tracking-wide">JRJ<span class="text-primary">Express</span></span>
+            <button class="btn btn-link text-white d-lg-none ms-auto p-0 text-decoration-none" onclick="toggleSidebar()">
+                <i class="bi bi-x-lg fs-5"></i>
             </button>
-            
         </div>
         
         <div class="flex-grow-1 overflow-y-auto px-3 py-4">
-            <p class="text-white small fw-bold text-uppercase mb-2 px-3">Painel Principal</p>
+            <p class="text-slate-500 small fw-bold text-uppercase mb-2 px-3">Painel Principal</p>
             <a href="{% url 'company_dashboard' %}" class="sidebar-link active mb-2">
-                <i class="bi bi-grid-1x2-fill text-white"></i> Meu Dashboard
+                <i class="bi bi-grid-1x2"></i> Meu Dashboard
             </a>
         </div>
 
@@ -55,11 +52,11 @@
             
             <div class="d-flex align-items-center gap-2 gap-md-3">
                 <a href="{% url 'os_create' %}" class="btn btn-primary fw-bold rounded-xl shadow-sm px-3 px-md-4 py-2 d-flex align-items-center gap-2">
-                    <i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline text-white">Nova Solicitação</span><span class="d-sm-none">Nova</span>
+                    <i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline">Nova Solicitação</span><span class="d-sm-none">Nova</span>
                 </a>
                 
                 <a href="{% url 'logout' %}" class="btn btn-outline-danger fw-bold rounded-xl shadow-sm px-3 py-2 d-flex align-items-center gap-2">
-                    <i class="bi bi-box-arrow-right"></i> <span class="d-none d-sm-inline text-black">Sair</span>
+                    <i class="bi bi-box-arrow-right"></i> <span class="d-none d-sm-inline">Sair</span>
                 </a>
             </div>
         </header>
